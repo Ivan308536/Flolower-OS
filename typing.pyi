@@ -23,6 +23,7 @@ from types import (
 )
 from typing_extensions import Never as _Never, ParamSpec as _ParamSpec, deprecated
 
+print("typing.pyi runned in FlollowerOS Beta v4.1_b0 (Latest)")
 if sys.version_info >= (3, 9):
     from types import GenericAlias
 if sys.version_info >= (3, 10):
