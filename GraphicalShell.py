@@ -58,6 +58,7 @@ TEXT_FONT = ("Segoe UI", 10)
 ICON_POS_FILE = "icons_pos_v10.json"
 NOTES_SAVE_PATH = r"D:\замітки.txt"
 PINNED_APPS_FILE = "pinned_apps_v10.json"
+WALLPAPER_PATH = "Flolower fone.jpg"
 
 # ------------------ Root ------------------
 root = tk.Tk()
@@ -86,51 +87,84 @@ try:
 except Exception:
     pinned_apps = []
 
-# ------------------ Canvas abstract wallpaper ------------------
+# ------------------ Canvas with wallpaper ------------------
 canvas = tk.Canvas(root, bg=BG, highlightthickness=0)
 canvas.place(relwidth=1, relheight=1)
 
-class AbstractCircle:
-    def __init__(self, x, y, r, color, vx, vy):
-        self.x, self.y, self.r = x, y, r
-        self.color = color
-        self.vx, self.vy = vx, vy
-        self.oid = canvas.create_oval(x-r, y-r, x+r, y+r, fill=color, outline="")
+# Флаг для отслеживания, какое изображение используется
+use_abstract_background = True
 
-    def step(self):
-        self.x += self.vx
-        self.y += self.vy
-        if self.x - self.r < 0 or self.x + self.r > SW: self.vx *= -1
-        if self.y - self.r < 0 or self.y + self.r > SH: self.vy *= -1
-        canvas.coords(self.oid, self.x-self.r, self.y-self.r, self.x+self.r, self.y+self.r)
+print(f"Попытка загрузить фоновое изображение: {WALLPAPER_PATH}")
+print(f"Файл существует: {os.path.exists(WALLPAPER_PATH)}")
+print(f"Текущая директория: {os.getcwd()}")
 
-    def fade_color(self):
-        try:
-            r = min(255, max(50, int(int(self.color[1:3],16)+random.randint(-4,4))))
-            g = min(255, max(50, int(int(self.color[3:5],16)+random.randint(-4,4))))
-            b = min(255, max(50, int(int(self.color[5:7],16)+random.randint(-4,4))))
-            self.color = f"#{r:02x}{g:02x}{b:02x}"
-            canvas.itemconfig(self.oid, fill=self.color)
-        except Exception:
-            pass
+try:
+    if os.path.exists(WALLPAPER_PATH):
+        wallpaper_img = Image.open(WALLPAPER_PATH)
+        # Масштабируем изображение под размер экрана
+        wallpaper_img = wallpaper_img.resize((SW, SH), Image.Resampling.LANCZOS)
+        wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
+        
+        # Создаем фоновое изображение на canvas
+        canvas.create_image(0, 0, anchor="nw", image=wallpaper_photo)
+        canvas.image = wallpaper_photo  # Сохраняем ссылку на изображение
+        
+        print(f"Фоновое изображение '{WALLPAPER_PATH}' успешно загружено")
+        use_abstract_background = False
+    else:
+        print(f"Файл '{WALLPAPER_PATH}' не найден")
+        use_abstract_background = True
+    
+except Exception as e:
+    print(f"Ошибка загрузки фонового изображения: {e}")
+    print("Используется абстрактный фон с кругами")
+    use_abstract_background = True
 
-abstract_circles = []
-for _ in range(35):
-    r = random.randint(80, 200)
-    x = random.randint(r, SW-r)
-    y = random.randint(r, SH-r)
-    color = random.choice(["#ff4d4d","#4dffff","#ffff4d","#ff4dff","#4dff4d"])
-    vx = random.uniform(-0.15,0.15)
-    vy = random.uniform(-0.1,0.1)
-    abstract_circles.append(AbstractCircle(x,y,r,color,vx,vy))
+# Создаем абстрактные круги только если не удалось загрузить изображение
+if use_abstract_background:
+    print("Создание абстрактного фона с кругами...")
+    
+    class AbstractCircle:
+        def __init__(self, x, y, r, color, vx, vy):
+            self.x, self.y, self.r = x, y, r
+            self.color = color
+            self.vx, self.vy = vx, vy
+            self.oid = canvas.create_oval(x-r, y-r, x+r, y+r, fill=color, outline="")
 
-def animate_abstract():
-    for c in abstract_circles:
-        c.step(); c.fade_color()
-    root.after(60, animate_abstract)
+        def step(self):
+            self.x += self.vx
+            self.y += self.vy
+            if self.x - self.r < 0 or self.x + self.r > SW: self.vx *= -1
+            if self.y - self.r < 0 or self.y + self.r > SH: self.vy *= -1
+            canvas.coords(self.oid, self.x-self.r, self.y-self.r, self.x+self.r, self.y+self.r)
 
-animate_abstract()
-canvas.tag_lower("all")
+        def fade_color(self):
+            try:
+                r = min(255, max(50, int(int(self.color[1:3],16)+random.randint(-4,4))))
+                g = min(255, max(50, int(int(self.color[3:5],16)+random.randint(-4,4))))
+                b = min(255, max(50, int(int(self.color[5:7],16)+random.randint(-4,4))))
+                self.color = f"#{r:02x}{g:02x}{b:02x}"
+                canvas.itemconfig(self.oid, fill=self.color)
+            except Exception:
+                pass
+
+    abstract_circles = []
+    for _ in range(35):
+        r = random.randint(80, 200)
+        x = random.randint(r, SW-r)
+        y = random.randint(r, SH-r)
+        color = random.choice(["#ff4d4d","#4dffff","#ffff4d","#ff4dff","#4dff4d"])
+        vx = random.uniform(-0.15,0.15)
+        vy = random.uniform(-0.1,0.1)
+        abstract_circles.append(AbstractCircle(x,y,r,color,vx,vy))
+
+    def animate_abstract():
+        for c in abstract_circles:
+            c.step(); c.fade_color()
+        root.after(60, animate_abstract)
+
+    animate_abstract()
+    print("Абстрактный фон с кругами создан успешно")
 
 # ------------------ Desktop ------------------
 desktop = tk.Frame(root, bg=BG)
@@ -499,7 +533,7 @@ def build_browser(parent):
 🔧 ТЕХНОЛОГИИ:
 • Qt WebEngine 5.15+
 • Chromium движок
-• Аппаратное ускорение
+• Аппарачное ускорение
 """
             
             text_widget = tk.Text(info_frame, bg="#1b1820", fg="white", bd=0, wrap="word",
@@ -763,7 +797,10 @@ def build_terminal(parent):
 
         if cmd == "help":
             write("Available commands: help, exit, ls, quit, about, joke, roll, flip, time, create, delete, write, mkdir, echo, python, cd, pwd, clear")
+            write("System commands: date, whoami, hostname, uname, ps, df, du, find, grep, wget, curl, ping, ifconfig, netstat")
+            write("File commands: cat, head, tail, cp, mv, rename, chmod, stat, file, size, tree")
             write("Python commands: python <code> - execute Python code")
+            write("Fun commands: weather, calc, quote, fact, password, base64, md5, sha1")
             return
 
         if cmd == "ls":
@@ -778,6 +815,11 @@ def build_terminal(parent):
         if cmd == "time":
             now = datetime.datetime.now()
             write(now.strftime("%H:%M:%S.%f")[:-3])
+            return
+            
+        if cmd == "date":
+            now = datetime.datetime.now()
+            write(now.strftime("%Y-%m-%d %A"))
             return
 
         if cmd in ("exit", "quit"):
@@ -897,6 +939,307 @@ def build_terminal(parent):
         elif cmd.startswith("echo "):
             message = cmd[5:].strip()
             write(message)
+            
+        elif cmd.startswith("cat "):
+            filename = cmd[4:].strip()
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    write(f"Content of '{filename}':")
+                    write(content)
+            except FileNotFoundError:
+                write("File not found.")
+            except Exception as e:
+                write(f"Error reading file: {e}")
+                
+        elif cmd.startswith("head "):
+            filename = cmd[5:].strip()
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    lines = file.readlines()[:10]
+                    write(f"First 10 lines of '{filename}':")
+                    for line in lines:
+                        write(line.rstrip())
+            except FileNotFoundError:
+                write("File not found.")
+            except Exception as e:
+                write(f"Error reading file: {e}")
+                
+        elif cmd.startswith("tail "):
+            filename = cmd[5:].strip()
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    lines = file.readlines()[-10:]
+                    write(f"Last 10 lines of '{filename}':")
+                    for line in lines:
+                        write(line.rstrip())
+            except FileNotFoundError:
+                write("File not found.")
+            except Exception as e:
+                write(f"Error reading file: {e}")
+                
+        elif cmd.startswith("cp "):
+            parts = cmd[3:].strip().split()
+            if len(parts) == 2:
+                src, dst = parts
+                try:
+                    with open(src, 'rb') as source_file:
+                        with open(dst, 'wb') as dest_file:
+                            dest_file.write(source_file.read())
+                    write(f"Copied '{src}' to '{dst}'")
+                except Exception as e:
+                    write(f"Error copying file: {e}")
+            else:
+                write("Usage: cp <source> <destination>")
+                
+        elif cmd.startswith("mv "):
+            parts = cmd[3:].strip().split()
+            if len(parts) == 2:
+                src, dst = parts
+                try:
+                    os.rename(src, dst)
+                    write(f"Moved '{src}' to '{dst}'")
+                except Exception as e:
+                    write(f"Error moving file: {e}")
+            else:
+                write("Usage: mv <source> <destination>")
+                
+        elif cmd.startswith("rename "):
+            parts = cmd[7:].strip().split()
+            if len(parts) == 2:
+                old_name, new_name = parts
+                try:
+                    os.rename(old_name, new_name)
+                    write(f"Renamed '{old_name}' to '{new_name}'")
+                except Exception as e:
+                    write(f"Error renaming file: {e}")
+            else:
+                write("Usage: rename <old_name> <new_name>")
+                
+        elif cmd == "whoami":
+            write(os.getlogin())
+            
+        elif cmd == "hostname":
+            write(os.uname().nodename)
+            
+        elif cmd == "uname":
+            system_info = os.uname()
+            write(f"System: {system_info.sysname}")
+            write(f"Node: {system_info.nodename}")
+            write(f"Release: {system_info.release}")
+            write(f"Version: {system_info.version}")
+            write(f"Machine: {system_info.machine}")
+            
+        elif cmd.startswith("find "):
+            pattern = cmd[5:].strip()
+            try:
+                matches = []
+                for root_dir, dirs, files in os.walk("."):
+                    for file in files:
+                        if pattern in file:
+                            matches.append(os.path.join(root_dir, file))
+                if matches:
+                    write(f"Found {len(matches)} files:")
+                    for match in matches[:20]:  # Limit output
+                        write(f"  {match}")
+                    if len(matches) > 20:
+                        write(f"... and {len(matches) - 20} more files")
+                else:
+                    write("No files found.")
+            except Exception as e:
+                write(f"Error searching: {e}")
+                
+        elif cmd.startswith("grep "):
+            pattern = cmd[5:].strip()
+            write("grep: enter filename to search in:")
+            entry.unbind("<Return>")
+            def wait_grep_file(event=None):
+                filename = entry.get().strip()
+                entry.delete(0, "end")
+                try:
+                    with open(filename, 'r', encoding='utf-8') as file:
+                        lines = file.readlines()
+                        matches = []
+                        for i, line in enumerate(lines, 1):
+                            if pattern in line:
+                                matches.append(f"Line {i}: {line.rstrip()}")
+                        if matches:
+                            write(f"Found {len(matches)} matches in '{filename}':")
+                            for match in matches[:10]:
+                                write(f"  {match}")
+                            if len(matches) > 10:
+                                write(f"... and {len(matches) - 10} more matches")
+                        else:
+                            write(f"No matches found in '{filename}'")
+                except FileNotFoundError:
+                    write("File not found.")
+                except Exception as e:
+                    write(f"Error searching file: {e}")
+                entry.bind("<Return>", process_command)
+            entry.bind("<Return>", wait_grep_file)
+            
+        elif cmd.startswith("wget "):
+            url = cmd[5:].strip()
+            write(f"Downloading {url}... (simulated)")
+            write("Note: Real download functionality requires internet connection")
+            
+        elif cmd.startswith("curl "):
+            url = cmd[5:].strip()
+            write(f"Fetching {url}... (simulated)")
+            write("Note: Real HTTP request requires internet connection")
+            
+        elif cmd.startswith("ping "):
+            host = cmd[5:].strip()
+            write(f"Pinging {host}... (simulated)")
+            write("Reply from 127.0.0.1: bytes=32 time<1ms TTL=128")
+            write("Reply from 127.0.0.1: bytes=32 time<1ms TTL=128")
+            write("Reply from 127.0.0.1: bytes=32 time<1ms TTL=128")
+            write("Reply from 127.0.0.1: bytes=32 time<1ms TTL=128")
+            
+        elif cmd == "ifconfig":
+            write("eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500")
+            write("        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255")
+            write("        ether 00:11:22:33:44:55  txqueuelen 1000  (Ethernet)")
+            write("lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536")
+            write("        inet 127.0.0.1  netmask 255.0.0.0")
+            
+        elif cmd == "netstat":
+            write("Active Internet connections (simulated)")
+            write("Proto Recv-Q Send-Q Local Address           Foreign Address         State")
+            write("tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN")
+            write("tcp        0      0 127.0.0.1:631           0.0.0.0:*               LISTEN")
+            
+        elif cmd.startswith("chmod "):
+            parts = cmd[6:].strip().split()
+            if len(parts) == 2:
+                mode, filename = parts
+                write(f"Changed permissions of '{filename}' to {mode} (simulated)")
+            else:
+                write("Usage: chmod <mode> <filename>")
+                
+        elif cmd.startswith("stat "):
+            filename = cmd[5:].strip()
+            try:
+                stat_info = os.stat(filename)
+                write(f"File: {filename}")
+                write(f"Size: {stat_info.st_size} bytes")
+                write(f"Permissions: {oct(stat_info.st_mode)[-3:]}")
+                write(f"Modified: {datetime.datetime.fromtimestamp(stat_info.st_mtime)}")
+            except FileNotFoundError:
+                write("File not found.")
+            except Exception as e:
+                write(f"Error getting file info: {e}")
+                
+        elif cmd.startswith("file "):
+            filename = cmd[5:].strip()
+            try:
+                if os.path.isdir(filename):
+                    write(f"{filename}: directory")
+                else:
+                    write(f"{filename}: regular file")
+            except Exception as e:
+                write(f"Error: {e}")
+                
+        elif cmd.startswith("size "):
+            filename = cmd[5:].strip()
+            try:
+                size = os.path.getsize(filename)
+                write(f"{filename}: {size} bytes ({size/1024:.2f} KB)")
+            except FileNotFoundError:
+                write("File not found.")
+            except Exception as e:
+                write(f"Error: {e}")
+                
+        elif cmd == "tree":
+            def print_tree(directory=".", prefix="", level=0):
+                if level > 3:  # Limit depth
+                    return
+                try:
+                    entries = os.listdir(directory)
+                    for i, entry in enumerate(entries):
+                        if entry.startswith('.'):  # Skip hidden files
+                            continue
+                        path = os.path.join(directory, entry)
+                        is_last = i == len(entries) - 1
+                        connector = "└── " if is_last else "├── "
+                        write(prefix + connector + entry)
+                        if os.path.isdir(path):
+                            extension = "    " if is_last else "│   "
+                            print_tree(path, prefix + extension, level + 1)
+                except PermissionError:
+                    write(prefix + "└── [Permission Denied]")
+                except Exception:
+                    pass
+                    
+            write(".")
+            print_tree()
+            
+        elif cmd == "weather":
+            cities = ["New York", "London", "Tokyo", "Paris", "Berlin"]
+            city = random.choice(cities)
+            temp = random.randint(-10, 35)
+            conditions = ["Sunny", "Cloudy", "Rainy", "Snowy", "Windy"]
+            condition = random.choice(conditions)
+            write(f"Weather in {city}: {temp}°C, {condition}")
+            
+        elif cmd.startswith("calc "):
+            expression = cmd[5:].strip()
+            try:
+                result = eval(expression)
+                write(f"{expression} = {result}")
+            except Exception as e:
+                write(f"Error calculating: {e}")
+                
+        elif cmd == "quote":
+            quotes = [
+                "The only way to do great work is to love what you do. - Steve Jobs",
+                "Innovation distinguishes between a leader and a follower. - Steve Jobs",
+                "Stay hungry, stay foolish. - Steve Jobs",
+                "Your time is limited, don't waste it living someone else's life. - Steve Jobs"
+            ]
+            write(random.choice(quotes))
+            
+        elif cmd == "fact":
+            facts = [
+                "Honey never spoils. Archaeologists have found pots of honey in ancient Egyptian tombs that are over 3,000 years old and still perfectly good to eat.",
+                "Octopuses have three hearts.",
+                "A day on Venus is longer than a year on Venus.",
+                "Bananas are berries, but strawberries aren't."
+            ]
+            write(random.choice(facts))
+            
+        elif cmd == "password":
+            length = 12
+            chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+            password = ''.join(random.choice(chars) for _ in range(length))
+            write(f"Generated password: {password}")
+            
+        elif cmd.startswith("base64 "):
+            text = cmd[7:].strip()
+            import base64
+            try:
+                encoded = base64.b64encode(text.encode()).decode()
+                write(f"Base64 encoded: {encoded}")
+            except Exception as e:
+                write(f"Error encoding: {e}")
+                
+        elif cmd.startswith("md5 "):
+            text = cmd[4:].strip()
+            import hashlib
+            try:
+                hash_md5 = hashlib.md5(text.encode()).hexdigest()
+                write(f"MD5 hash: {hash_md5}")
+            except Exception as e:
+                write(f"Error hashing: {e}")
+                
+        elif cmd.startswith("sha1 "):
+            text = cmd[5:].strip()
+            import hashlib
+            try:
+                hash_sha1 = hashlib.sha1(text.encode()).hexdigest()
+                write(f"SHA1 hash: {hash_sha1}")
+            except Exception as e:
+                write(f"Error hashing: {e}")
 
         elif cmd.startswith("python "):
             python_code = cmd[7:].strip()
@@ -915,6 +1258,7 @@ def build_terminal(parent):
         elif cmd == "about":
             write("Flolower OS v1.0 (Beta)")
             write("A custom operating system interface built with Python and Tkinter")
+            write("Terminal with enhanced command set")
             return
             
         else:
@@ -1018,7 +1362,7 @@ def open_app_window(key,title):
                 btn.destroy()
                 del task_buttons[win]
         except Exception:
-        pass
+            pass
         try:
             win.destroy()
         except:
@@ -1141,9 +1485,9 @@ def create_desktop_icon(x, y, emoji, title, key):
 
     def do_drag(e):
         try:
-            nx = max(0, min(SW-60, e.x_root - f._drag_offset_x))
-            ny = max(0, min(SH-120, e.y_root - f._drag_offset_y))
-            f.place(x=nx, y=ny)
+             nx = max(0, min(SW-60, e.x_root - f._drag_offset_x))
+             ny = max(0, min(SH-120, e.y_root - f._drag_offset_y))
+             f.place(x=nx, y=ny)
         except:
             pass
 
@@ -1166,6 +1510,7 @@ for i, (emoji, title, key) in enumerate(DESKTOP_ICONS):
 
 # ------------------ Mainloop ------------------
 start_menu.place(y=SH+20)
-canvas.tag_lower("all")
+# Убедитесь, что canvas находится позади всего
+canvas.lower = lambda: None  # Убираем проблемный вызов
 root.protocol("WM_DELETE_WINDOW", lambda: (save_icon_positions(), root.destroy()))
 root.mainloop()
