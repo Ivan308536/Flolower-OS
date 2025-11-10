@@ -47,7 +47,8 @@ APP_LIST = [
     ("🌐", "Браузер", "browser"),
     ("📅", "Календарь", "calendar"),
     ("💻", "Терминал", "terminal"),
-    ("📁", "Файлы", "files"),  # Добавляем файловый менеджер
+    ("📁", "Файлы", "files"),
+    ("🎮", "Click on smile!", "smile_game"),  # Добавляем игру
 ]
 
 DESKTOP_ICONS = [
@@ -56,7 +57,8 @@ DESKTOP_ICONS = [
     ("📅", "Календарь", "calendar"),
     ("💻", "Терминал", "terminal"),
     ("🗑️", "Корзина", "trash"),
-    ("📁", "Файлы", "files"),  # Добавляем файловый менеджер
+    ("📁", "Файлы", "files"),
+    ("🎮", "Click on smile!", "smile_game"),  # Добавляем игру на рабочий стол
 ]
 
 ICON_FONT = ("Segoe UI Emoji", 34)
@@ -164,6 +166,150 @@ def delete_permanently(trash_item_name):
         return True, "Файл удален навсегда"
     except Exception as e:
         return False, f"Ошибка удаления: {str(e)}"
+
+# ------------------ Game Class ------------------
+class SmileGame:
+    def __init__(self, parent):
+        self.parent = parent
+        self.points = 0
+        self.jumping = False
+        self.jump_start_time = 0
+        self.jump_offset = 0
+        self.game_active = True
+        
+        # Константы игры
+        self.WIDTH, self.HEIGHT = 600, 500
+        self.BLOCK_SIZE = 120
+        self.JUMP_DURATION = 0.3
+        self.JUMP_HEIGHT = 25
+        
+        # Создаем фрейм для игры
+        self.frame = tk.Frame(parent, bg=WINDOW_BG)
+        self.frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Канва для игры
+        self.canvas = tk.Canvas(self.frame, width=self.WIDTH, height=self.HEIGHT, 
+                               bg=WINDOW_BG, highlightthickness=0)
+        self.canvas.pack(pady=20)
+        
+        # Заголовок
+        title_label = tk.Label(self.frame, text="🎮 Click on smile!", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Создаем смайл (используем эмодзи если нет изображения)
+        try:
+            # Пробуем загрузить изображение смайла
+            if os.path.exists("smile.png"):
+                img = Image.open("smile.png").resize((self.BLOCK_SIZE, self.BLOCK_SIZE))
+                self.smile_image = ImageTk.PhotoImage(img)
+                self.smile = self.canvas.create_image(self.WIDTH//2, self.HEIGHT//2, 
+                                                    image=self.smile_image)
+            else:
+                # Создаем смайл с помощью эмодзи
+                self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
+                                                   text="😊", font=("Segoe UI Emoji", 80))
+        except Exception as e:
+            print(f"Ошибка загрузки изображения смайла: {e}")
+            # Создаем смайл с помощью эмодзи
+            self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
+                                               text="😊", font=("Segoe UI Emoji", 80))
+        
+        # Текст очков
+        self.score_text = self.canvas.create_text(self.WIDTH//2, 40, 
+                                                text="Очки: 0", 
+                                                font=("Segoe UI", 24), 
+                                                fill=TEXT)
+        
+        # Инструкция
+        instruction = self.canvas.create_text(self.WIDTH//2, self.HEIGHT - 30, 
+                                            text="Кликай на смайл чтобы зарабатывать очки!", 
+                                            font=("Segoe UI", 12), 
+                                            fill=TEXT)
+        
+        # Кнопка сброса
+        reset_btn = tk.Button(self.frame, text="🔄 Начать заново", 
+                             bg=MENU_ITEM, fg=TEXT, font=TEXT_FONT,
+                             command=self.reset_game)
+        reset_btn.pack(pady=10)
+        
+        # Обработка кликов
+        self.canvas.bind("<Button-1>", self.click)
+        
+        # Запуск обновления игры
+        self.update()
+
+    def click(self, event):
+        if not self.game_active:
+            return
+            
+        # Координаты смайла
+        x1 = self.WIDTH//2 - self.BLOCK_SIZE//2
+        y1 = self.HEIGHT//2 - self.BLOCK_SIZE//2 - self.jump_offset
+        x2 = x1 + self.BLOCK_SIZE
+        y2 = y1 + self.BLOCK_SIZE
+
+        # Проверка попадания по смайлу
+        if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            self.points += 1
+            self.jumping = True
+            self.jump_start_time = time.time()
+            
+            # Меняем цвет смайла при клике
+            self.canvas.itemconfig(self.score_text, fill="#4dff4d")  # Зеленый цвет
+
+    def update(self):
+        # Анимация прыжка
+        if self.jumping:
+            elapsed = time.time() - self.jump_start_time
+            if elapsed < self.JUMP_DURATION:
+                # Параболическая траектория прыжка
+                progress = elapsed / self.JUMP_DURATION
+                self.jump_offset = self.JUMP_HEIGHT * (1 - (2 * progress - 1) ** 2)
+            else:
+                self.jumping = False
+                self.jump_offset = 0
+                # Возвращаем обычный цвет текста
+                self.canvas.itemconfig(self.score_text, fill=TEXT)
+
+        # Перемещение смайла
+        if hasattr(self, 'smile_image'):
+            # Если используем изображение
+            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
+        else:
+            # Если используем текст (эмодзи)
+            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
+
+        # Обновление счёта
+        self.canvas.itemconfig(self.score_text, text=f"Очки: {self.points}")
+        
+        # Увеличиваем сложность при достижении определенного количества очков
+        if self.points >= 20:
+            self.JUMP_DURATION = 0.2
+            self.JUMP_HEIGHT = 35
+        elif self.points >= 10:
+            self.JUMP_DURATION = 0.25
+            self.JUMP_HEIGHT = 30
+
+        # Следующий кадр
+        if self.game_active:
+            self.parent.after(30, self.update)
+
+    def reset_game(self):
+        """Сброс игры"""
+        self.points = 0
+        self.jumping = False
+        self.jump_offset = 0
+        self.JUMP_DURATION = 0.3
+        self.JUMP_HEIGHT = 25
+        self.game_active = True
+        self.canvas.itemconfig(self.score_text, fill=TEXT)
+        self.update()
+
+def build_smile_game(parent):
+    """Создает экземпляр игры в окне"""
+    game = SmileGame(parent)
+    return game
 
 # ------------------ Root ------------------
 root = tk.Tk()
@@ -2101,6 +2247,8 @@ def open_app_window(key,title):
         build_trash(content)
     elif key == "files":  # Файловый менеджер
         build_files(content)
+    elif key == "smile_game":  # Игра "Click on smile!"
+        build_smile_game(content)
     else:
         tk.Label(content, text=f"{title} — демo", bg=WINDOW_BG, fg=TEXT).pack(padx=12, pady=12)
 
