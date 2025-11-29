@@ -11,6 +11,11 @@ import sys
 import threading
 import shutil
 from pathlib import Path
+import math
+import requests
+from io import BytesIO
+import tkinter.filedialog
+import tkinter.messagebox
 
 swearing = ["fuck", "bitch","dick","хуй","пизда","говно","пиздец","нахуй","сука","блять","ебать"]
 
@@ -48,7 +53,20 @@ APP_LIST = [
     ("📅", "Календарь", "calendar"),
     ("💻", "Терминал", "terminal"),
     ("📁", "Файлы", "files"),
-    ("🎮", "Click on smile!", "smile_game"),  # Добавляем игру
+    ("🎮", "Click on smile!", "smile_game"),
+    ("🎨", "Рисовалка", "paint"),
+    ("🎵", "Музыка", "music"),
+    ("📊", "Погода", "weather"),
+    ("🧮", "Конвертер", "converter"),
+    ("⏰", "Таймер", "timer"),
+    ("📷", "Камера", "camera"),
+    ("🔍", "Поиск", "search"),
+    ("📝", "Текст редактор", "text_editor"),
+    ("🎲", "Игры", "games"),
+    ("🖼️", "Галерея", "gallery"),
+    ("⚙️", "Настройки", "settings"),
+    ("📚", "Книги", "books"),
+    ("🗂️", "Менеджер задач", "task_manager"),
 ]
 
 DESKTOP_ICONS = [
@@ -58,7 +76,10 @@ DESKTOP_ICONS = [
     ("💻", "Терминал", "terminal"),
     ("🗑️", "Корзина", "trash"),
     ("📁", "Файлы", "files"),
-    ("🎮", "Click on smile!", "smile_game"),  # Добавляем игру на рабочий стол
+    ("🎮", "Click on smile!", "smile_game"),
+    ("🎨", "Рисовалка", "paint"),
+    ("🎵", "Музыка", "music"),
+    ("📊", "Погода", "weather"),
 ]
 
 ICON_FONT = ("Segoe UI Emoji", 34)
@@ -69,254 +90,6 @@ NOTES_SAVE_PATH = r"D:\замітки.txt"
 PINNED_APPS_FILE = "pinned_apps_v10.json"
 WALLPAPER_PATH = "Flolower fone.jpg"
 TRASH_DIR = "FlolowerTrash"  # Папка для корзины
-
-# ------------------ Trash System ------------------
-def ensure_trash_dir():
-    """Создает папку для корзины если её нет"""
-    if not os.path.exists(TRASH_DIR):
-        os.makedirs(TRASH_DIR, exist_ok=True)
-
-def get_trash_contents():
-    """Возвращает содержимое корзины"""
-    ensure_trash_dir()
-    contents = []
-    try:
-        for item in os.listdir(TRASH_DIR):
-            item_path = os.path.join(TRASH_DIR, item)
-            stat = os.stat(item_path)
-            contents.append({
-                'name': item,
-                'path': item_path,
-                'size': stat.st_size,
-                'deleted_time': stat.st_mtime,
-                'is_dir': os.path.isdir(item_path)
-            })
-    except Exception as e:
-        print(f"Ошибка чтения корзины: {e}")
-    return contents
-
-def move_to_trash(file_path):
-    """Перемещает файл/папку в корзину"""
-    try:
-        ensure_trash_dir()
-        if not os.path.exists(file_path):
-            return False, "Файл не существует"
-        
-        file_name = os.path.basename(file_path)
-        trash_path = os.path.join(TRASH_DIR, file_name)
-        
-        # Если файл с таким именем уже есть в корзине, добавляем суффикс
-        counter = 1
-        original_trash_path = trash_path
-        while os.path.exists(trash_path):
-            name, ext = os.path.splitext(file_name)
-            trash_path = os.path.join(TRASH_DIR, f"{name}_{counter}{ext}")
-            counter += 1
-        
-        shutil.move(file_path, trash_path)
-        return True, "Успешно перемещено в корзину"
-    except Exception as e:
-        return False, f"Ошибка: {str(e)}"
-
-def restore_from_trash(trash_item_name, restore_path=None):
-    """Восстанавливает файл из корзины"""
-    try:
-        trash_path = os.path.join(TRASH_DIR, trash_item_name)
-        if not os.path.exists(trash_path):
-            return False, "Файл не найден в корзине"
-        
-        if restore_path is None:
-            restore_path = os.path.join(os.getcwd(), trash_item_name)
-        
-        # Если файл уже существует в месте восстановления
-        counter = 1
-        original_restore_path = restore_path
-        while os.path.exists(restore_path):
-            name, ext = os.path.splitext(trash_item_name)
-            restore_path = os.path.join(os.path.dirname(original_restore_path), f"{name}_restored_{counter}{ext}")
-            counter += 1
-        
-        shutil.move(trash_path, restore_path)
-        return True, "Файл восстановлен"
-    except Exception as e:
-        return False, f"Ошибка восстановления: {str(e)}"
-
-def empty_trash():
-    """Очищает корзину полностью"""
-    try:
-        ensure_trash_dir()
-        for item in os.listdir(TRASH_DIR):
-            item_path = os.path.join(TRASH_DIR, item)
-            if os.path.isdir(item_path):
-                shutil.rmtree(item_path)
-            else:
-                os.remove(item_path)
-        return True, "Корзина очищена"
-    except Exception as e:
-        return False, f"Ошибка очистки: {str(e)}"
-
-def delete_permanently(trash_item_name):
-    """Удаляет файл из корзины навсегда"""
-    try:
-        trash_path = os.path.join(TRASH_DIR, trash_item_name)
-        if os.path.isdir(trash_path):
-            shutil.rmtree(trash_path)
-        else:
-            os.remove(trash_path)
-        return True, "Файл удален навсегда"
-    except Exception as e:
-        return False, f"Ошибка удаления: {str(e)}"
-
-# ------------------ Game Class ------------------
-class SmileGame:
-    def __init__(self, parent):
-        self.parent = parent
-        self.points = 0
-        self.jumping = False
-        self.jump_start_time = 0
-        self.jump_offset = 0
-        self.game_active = True
-        
-        # Константы игры
-        self.WIDTH, self.HEIGHT = 600, 500
-        self.BLOCK_SIZE = 120
-        self.JUMP_DURATION = 0.3
-        self.JUMP_HEIGHT = 25
-        
-        # Создаем фрейм для игры
-        self.frame = tk.Frame(parent, bg=WINDOW_BG)
-        self.frame.pack(expand=True, fill="both", padx=12, pady=12)
-        
-        # Канва для игры
-        self.canvas = tk.Canvas(self.frame, width=self.WIDTH, height=self.HEIGHT, 
-                               bg=WINDOW_BG, highlightthickness=0)
-        self.canvas.pack(pady=20)
-        
-        # Заголовок
-        title_label = tk.Label(self.frame, text="🎮 Click on smile!", 
-                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
-        title_label.pack(pady=10)
-        
-        # Создаем смайл (используем эмодзи если нет изображения)
-        try:
-            # Пробуем загрузить изображение смайла
-            if os.path.exists("smile.png"):
-                img = Image.open("smile.png").resize((self.BLOCK_SIZE, self.BLOCK_SIZE))
-                self.smile_image = ImageTk.PhotoImage(img)
-                self.smile = self.canvas.create_image(self.WIDTH//2, self.HEIGHT//2, 
-                                                    image=self.smile_image)
-            else:
-                # Создаем смайл с помощью эмодзи
-                self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
-                                                   text="😊", font=("Segoe UI Emoji", 80))
-        except Exception as e:
-            print(f"Ошибка загрузки изображения смайла: {e}")
-            # Создаем смайл с помощью эмодзи
-            self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
-                                               text="😊", font=("Segoe UI Emoji", 80))
-        
-        # Текст очков
-        self.score_text = self.canvas.create_text(self.WIDTH//2, 40, 
-                                                text="Очки: 0", 
-                                                font=("Segoe UI", 24), 
-                                                fill=TEXT)
-        
-        # Инструкция
-        instruction = self.canvas.create_text(self.WIDTH//2, self.HEIGHT - 30, 
-                                            text="Кликай на смайл чтобы зарабатывать очки!", 
-                                            font=("Segoe UI", 12), 
-                                            fill=TEXT)
-        
-        # Кнопка сброса
-        reset_btn = tk.Button(self.frame, text="🔄 Начать заново", 
-                             bg=MENU_ITEM, fg=TEXT, font=TEXT_FONT,
-                             command=self.reset_game)
-        reset_btn.pack(pady=10)
-        
-        # Обработка кликов
-        self.canvas.bind("<Button-1>", self.click)
-        
-        # Запуск обновления игры
-        self.update()
-
-    def click(self, event):
-        if not self.game_active:
-            return
-            
-        # Координаты смайла
-        x1 = self.WIDTH//2 - self.BLOCK_SIZE//2
-        y1 = self.HEIGHT//2 - self.BLOCK_SIZE//2 - self.jump_offset
-        x2 = x1 + self.BLOCK_SIZE
-        y2 = y1 + self.BLOCK_SIZE
-
-        # Проверка попадания по смайлу
-        if x1 <= event.x <= x2 and y1 <= event.y <= y2:
-            self.points += 1
-            self.jumping = True
-            self.jump_start_time = time.time()
-            
-            # Меняем цвет смайла при клике
-            self.canvas.itemconfig(self.score_text, fill="#4dff4d")  # Зеленый цвет
-
-    def update(self):
-        # Анимация прыжка
-        if self.jumping:
-            elapsed = time.time() - self.jump_start_time
-            if elapsed < self.JUMP_DURATION:
-                # Параболическая траектория прыжка
-                progress = elapsed / self.JUMP_DURATION
-                self.jump_offset = self.JUMP_HEIGHT * (1 - (2 * progress - 1) ** 2)
-            else:
-                self.jumping = False
-                self.jump_offset = 0
-                # Возвращаем обычный цвет текста
-                self.canvas.itemconfig(self.score_text, fill=TEXT)
-
-        # Перемещение смайла
-        if hasattr(self, 'smile_image'):
-            # Если используем изображение
-            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
-        else:
-            # Если используем текст (эмодзи)
-            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
-
-        # Обновление счёта
-        self.canvas.itemconfig(self.score_text, text=f"Очки: {self.points}")
-        
-        # Увеличиваем сложность при достижении определенного количества очков
-        if self.points >= 20:
-            self.JUMP_DURATION = 0.2
-            self.JUMP_HEIGHT = 35
-        elif self.points >= 10:
-            self.JUMP_DURATION = 0.25
-            self.JUMP_HEIGHT = 30
-
-        # Следующий кадр
-        if self.game_active:
-            self.parent.after(30, self.update)
-
-    def reset_game(self):
-        """Сброс игры"""
-        self.points = 0
-        self.jumping = False
-        self.jump_offset = 0
-        self.JUMP_DURATION = 0.3
-        self.JUMP_HEIGHT = 25
-        self.game_active = True
-        self.canvas.itemconfig(self.score_text, fill=TEXT)
-        self.update()
-
-def build_smile_game(parent):
-    """Создает экземпляр игры в окне"""
-    game = SmileGame(parent)
-    return game
-
-# ------------------ Root ------------------
-root = tk.Tk()
-root.title("Flolower OS v1.0(beta)")
-root.attributes("-fullscreen", True)
-root.configure(bg=BG)
-SW, SH = root.winfo_screenwidth(), root.winfo_screenheight()
 
 # ------------------ Load saved icon positions ------------------
 try:
@@ -337,6 +110,13 @@ try:
         pinned_apps = []
 except Exception:
     pinned_apps = []
+
+# ------------------ Root ------------------
+root = tk.Tk()
+root.title("Flolower OS v1.0(beta)")
+root.attributes("-fullscreen", True)
+root.configure(bg=BG)
+SW, SH = root.winfo_screenwidth(), root.winfo_screenheight()
 
 # ------------------ Canvas with wallpaper ------------------
 canvas = tk.Canvas(root, bg=BG, highlightthickness=0)
@@ -605,16 +385,42 @@ menu_visible=False
 search_var = tk.StringVar()
 search_entry = tk.Entry(start_menu,textvariable=search_var,bg="#2b2334",fg=TEXT,bd=0,font=TEXT_FONT,insertbackground=TEXT)
 search_entry.place(x=16,y=16,width=MENU_W-32,height=36)
+
+# Увеличиваем высоту apps_frame чтобы вместить все приложения
 apps_frame = tk.Frame(start_menu,bg=MENU_BG)
 apps_frame.place(x=16,y=72,width=MENU_W-32,height=MENU_H-88)
+
+# Создаем Canvas и Scrollbar для прокрутки
+apps_canvas = tk.Canvas(apps_frame, bg=MENU_BG, highlightthickness=0)
+scrollbar = tk.Scrollbar(apps_frame, orient="vertical", command=apps_canvas.yview)
+scrollable_frame = tk.Frame(apps_canvas, bg=MENU_BG)
+
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: apps_canvas.configure(scrollregion=apps_canvas.bbox("all"))
+)
+
+apps_canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+apps_canvas.configure(yscrollcommand=scrollbar.set)
+
+apps_canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
+
+# Привязываем колесико мыши к прокрутке
+def on_mousewheel(event):
+    apps_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+apps_canvas.bind("<MouseWheel>", on_mousewheel)
+
 app_widgets=[]
 
 def on_start_app(app_key, app_title):
     toggle_menu(False)
     open_app_window(app_key, app_title)
 
+# Создаем приложения в scrollable_frame вместо apps_frame
 for emoji,title,key in APP_LIST:
-    row=tk.Frame(apps_frame,bg=MENU_ITEM,height=44)
+    row=tk.Frame(scrollable_frame,bg=MENU_ITEM,height=44)
     row.pack(fill="x", pady=6)
     ico=tk.Label(row,text=emoji,bg=MENU_ITEM,fg=TEXT,font=ICON_FONT)
     ico.pack(side="left", padx=(8,10))
@@ -639,21 +445,32 @@ def toggle_pin(key, title, emoji):
         unpin_app(key)
     else:
         pin_app(key, title, emoji)
-    for widget in apps_frame.winfo_children():
+    # Обновляем все кнопки закрепления
+    for widget in scrollable_frame.winfo_children():
         for child in widget.winfo_children():
             if isinstance(child, tk.Frame):
                 for grandchild in child.winfo_children():
                     if isinstance(grandchild, tk.Button) and grandchild['text'] in ("📌", "📍"):
-                        if key in pinned_apps:
-                            grandchild.config(text="📌")
-                        else:
-                            grandchild.config(text="📍")
+                        # Находим соответствующий ключ приложения
+                        for app_emoji, app_title, app_key in APP_LIST:
+                            if app_key == key:
+                                if key in pinned_apps:
+                                    grandchild.config(text="📌")
+                                else:
+                                    grandchild.config(text="📍")
+                                break
 
 def refresh_app_list(*_):
     q=search_var.get().lower().strip()
     for w,title in app_widgets:
-        w.pack_forget()
-        if not q or q in title.lower(): w.pack(fill="x",pady=6)
+        if not q or q in title.lower(): 
+            w.pack(fill="x", pady=6)
+        else:
+            w.pack_forget()
+            
+    # Обновляем scrollregion после фильтрации
+    apps_canvas.configure(scrollregion=apps_canvas.bbox("all"))
+
 search_var.trace_add("write", refresh_app_list)
 
 def show_menu():
@@ -747,7 +564,1493 @@ def close_window(win, btn):
     except:
         pass
 
+# ------------------ Trash System ------------------
+def ensure_trash_dir():
+    """Создает папку для корзины если её нет"""
+    if not os.path.exists(TRASH_DIR):
+        os.makedirs(TRASH_DIR, exist_ok=True)
+
+def get_trash_contents():
+    """Возвращает содержимое корзины"""
+    ensure_trash_dir()
+    contents = []
+    try:
+        for item in os.listdir(TRASH_DIR):
+            item_path = os.path.join(TRASH_DIR, item)
+            stat = os.stat(item_path)
+            contents.append({
+                'name': item,
+                'path': item_path,
+                'size': stat.st_size,
+                'deleted_time': stat.st_mtime,
+                'is_dir': os.path.isdir(item_path)
+            })
+    except Exception as e:
+        print(f"Ошибка чтения корзины: {e}")
+    return contents
+
+def move_to_trash(file_path):
+    """Перемещает файл/папку в корзину"""
+    try:
+        ensure_trash_dir()
+        if not os.path.exists(file_path):
+            return False, "Файл не существует"
+        
+        file_name = os.path.basename(file_path)
+        trash_path = os.path.join(TRASH_DIR, file_name)
+        
+        # Если файл с таким именем уже есть в корзине, добавляем суффикс
+        counter = 1
+        original_trash_path = trash_path
+        while os.path.exists(trash_path):
+            name, ext = os.path.splitext(file_name)
+            trash_path = os.path.join(TRASH_DIR, f"{name}_{counter}{ext}")
+            counter += 1
+        
+        shutil.move(file_path, trash_path)
+        return True, "Успешно перемещено в корзину"
+    except Exception as e:
+        return False, f"Ошибка: {str(e)}"
+
+def restore_from_trash(trash_item_name, restore_path=None):
+    """Восстанавливает файл из корзины"""
+    try:
+        trash_path = os.path.join(TRASH_DIR, trash_item_name)
+        if not os.path.exists(trash_path):
+            return False, "Файл не найден в корзине"
+        
+        if restore_path is None:
+            restore_path = os.path.join(os.getcwd(), trash_item_name)
+        
+        # Если файл уже существует в месте восстановления
+        counter = 1
+        original_restore_path = restore_path
+        while os.path.exists(restore_path):
+            name, ext = os.path.splitext(trash_item_name)
+            restore_path = os.path.join(os.path.dirname(original_restore_path), f"{name}_restored_{counter}{ext}")
+            counter += 1
+        
+        shutil.move(trash_path, restore_path)
+        return True, "Файл восстановлен"
+    except Exception as e:
+        return False, f"Ошибка восстановления: {str(e)}"
+
+def empty_trash():
+    """Очищает корзину полностью"""
+    try:
+        ensure_trash_dir()
+        for item in os.listdir(TRASH_DIR):
+            item_path = os.path.join(TRASH_DIR, item)
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+        return True, "Корзина очищена"
+    except Exception as e:
+        return False, f"Ошибка очистки: {str(e)}"
+
+def delete_permanently(trash_item_name):
+    """Удаляет файл из корзины навсегда"""
+    try:
+        trash_path = os.path.join(TRASH_DIR, trash_item_name)
+        if os.path.isdir(trash_path):
+            shutil.rmtree(trash_path)
+        else:
+            os.remove(trash_path)
+        return True, "Файл удален навсегда"
+    except Exception as e:
+        return False, f"Ошибка удаления: {str(e)}"
+
+# ------------------ Game Class ------------------
+class SmileGame:
+    def __init__(self, parent):
+        self.parent = parent
+        self.points = 0
+        self.jumping = False
+        self.jump_start_time = 0
+        self.jump_offset = 0
+        self.game_active = True
+        
+        # Константы игры
+        self.WIDTH, self.HEIGHT = 600, 500
+        self.BLOCK_SIZE = 120
+        self.JUMP_DURATION = 0.3
+        self.JUMP_HEIGHT = 25
+        
+        # Создаем фрейм для игры
+        self.frame = tk.Frame(parent, bg=WINDOW_BG)
+        self.frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Канва для игры
+        self.canvas = tk.Canvas(self.frame, width=self.WIDTH, height=self.HEIGHT, 
+                               bg=WINDOW_BG, highlightthickness=0)
+        self.canvas.pack(pady=20)
+        
+        # Заголовок
+        title_label = tk.Label(self.frame, text="🎮 Click on smile!", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Создаем смайл (используем эмодзи если нет изображения)
+        try:
+            # Пробуем загрузить изображение смайла
+            if os.path.exists("smile.png"):
+                img = Image.open("smile.png").resize((self.BLOCK_SIZE, self.BLOCK_SIZE))
+                self.smile_image = ImageTk.PhotoImage(img)
+                self.smile = self.canvas.create_image(self.WIDTH//2, self.HEIGHT//2, 
+                                                    image=self.smile_image)
+            else:
+                # Создаем смайл с помощью эмодзи
+                self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
+                                                   text="😊", font=("Segoe UI Emoji", 80))
+        except Exception as e:
+            print(f"Ошибка загрузки изображения смайла: {e}")
+            # Создаем смайл с помощью эмодзи
+            self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
+                                               text="😊", font=("Segoe UI Emoji", 80))
+        
+        # Текст очков
+        self.score_text = self.canvas.create_text(self.WIDTH//2, 40, 
+                                                text="Очки: 0", 
+                                                font=("Segoe UI", 24), 
+                                                fill=TEXT)
+        
+        # Инструкция
+        instruction = self.canvas.create_text(self.WIDTH//2, self.HEIGHT - 30, 
+                                            text="Кликай на смайл чтобы зарабатывать очки!", 
+                                            font=("Segoe UI", 12), 
+                                            fill=TEXT)
+        
+        # Кнопка сброса
+        reset_btn = tk.Button(self.frame, text="🔄 Начать заново", 
+                             bg=MENU_ITEM, fg=TEXT, font=TEXT_FONT,
+                             command=self.reset_game)
+        reset_btn.pack(pady=10)
+        
+        # Обработка кликов
+        self.canvas.bind("<Button-1>", self.click)
+        
+        # Запуск обновления игры
+        self.update()
+
+    def click(self, event):
+        if not self.game_active:
+            return
+            
+        # Координаты смайла
+        x1 = self.WIDTH//2 - self.BLOCK_SIZE//2
+        y1 = self.HEIGHT//2 - self.BLOCK_SIZE//2 - self.jump_offset
+        x2 = x1 + self.BLOCK_SIZE
+        y2 = y1 + self.BLOCK_SIZE
+
+        # Проверка попадания по смайлу
+        if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            self.points += 1
+            self.jumping = True
+            self.jump_start_time = time.time()
+            
+            # Меняем цвет смайла при клике
+            self.canvas.itemconfig(self.score_text, fill="#4dff4d")  # Зеленый цвет
+
+    def update(self):
+        # Анимация прыжка
+        if self.jumping:
+            elapsed = time.time() - self.jump_start_time
+            if elapsed < self.JUMP_DURATION:
+                # Параболическая траектория прыжка
+                progress = elapsed / self.JUMP_DURATION
+                self.jump_offset = self.JUMP_HEIGHT * (1 - (2 * progress - 1) ** 2)
+            else:
+                self.jumping = False
+                self.jump_offset = 0
+                # Возвращаем обычный цвет текста
+                self.canvas.itemconfig(self.score_text, fill=TEXT)
+
+        # Перемещение смайла
+        if hasattr(self, 'smile_image'):
+            # Если используем изображение
+            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
+        else:
+            # Если используем текст (эмодзи)
+            self.canvas.coords(self.smile, self.WIDTH//2, self.HEIGHT//2 - self.jump_offset)
+
+        # Обновление счёта
+        self.canvas.itemconfig(self.score_text, text=f"Очки: {self.points}")
+        
+        # Увеличиваем сложность при достижении определенного количества очков
+        if self.points >= 20:
+            self.JUMP_DURATION = 0.2
+            self.JUMP_HEIGHT = 35
+        elif self.points >= 10:
+            self.JUMP_DURATION = 0.25
+            self.JUMP_HEIGHT = 30
+
+        # Следующий кадр
+        if self.game_active:
+            self.parent.after(30, self.update)
+
+    def reset_game(self):
+        """Сброс игры"""
+        self.points = 0
+        self.jumping = False
+        self.jump_offset = 0
+        self.JUMP_DURATION = 0.3
+        self.JUMP_HEIGHT = 25
+        self.game_active = True
+        self.canvas.itemconfig(self.score_text, fill=TEXT)
+        self.update()
+
+def build_smile_game(parent):
+    """Создает экземпляр игры в окне"""
+    game = SmileGame(parent)
+    return game
+
+# ------------------ New Apps Classes ------------------
+
+class PaintApp:
+    def __init__(self, parent):
+        self.parent = parent
+        self.setup_ui()
+        
+    def setup_ui(self):
+        # Main frame
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="🎨 Рисовалка", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Toolbar
+        toolbar = tk.Frame(main_frame, bg=MENU_ITEM)
+        toolbar.pack(fill="x", pady=10)
+        
+        # Colors
+        colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", 
+                 "#000000", "#FFFFFF", "#FFA500", "#800080"]
+        
+        self.current_color = tk.StringVar(value="#FF0000")
+        
+        for color in colors:
+            btn = tk.Radiobutton(toolbar, bg=color, variable=self.current_color, 
+                               value=color, width=2, height=1, indicatoron=0)
+            btn.pack(side="left", padx=2)
+        
+        # Brush size
+        size_frame = tk.Frame(toolbar, bg=MENU_ITEM)
+        size_frame.pack(side="right", padx=10)
+        
+        tk.Label(size_frame, text="Размер:", bg=MENU_ITEM, fg=TEXT).pack(side="left")
+        self.brush_size = tk.Scale(size_frame, from_=1, to=20, orient="horizontal",
+                                 bg=MENU_ITEM, fg=TEXT, highlightbackground=MENU_ITEM)
+        self.brush_size.set(5)
+        self.brush_size.pack(side="left", padx=5)
+        
+        # Clear button
+        clear_btn = tk.Button(toolbar, text="Очистить", bg="#ff4444", fg="white",
+                            command=self.clear_canvas)
+        clear_btn.pack(side="right", padx=10)
+        
+        # Canvas
+        self.canvas = tk.Canvas(main_frame, bg="white", width=600, height=400)
+        self.canvas.pack(expand=True, fill="both", pady=10)
+        
+        # Bind events
+        self.canvas.bind("<B1-Motion>", self.paint)
+        self.canvas.bind("<Button-1>", self.paint)
+        
+        self.last_x = None
+        self.last_y = None
+        
+    def paint(self, event):
+        x, y = event.x, event.y
+        if self.last_x is not None and self.last_y is not None:
+            self.canvas.create_line(self.last_x, self.last_y, x, y,
+                                  width=self.brush_size.get(),
+                                  fill=self.current_color.get(),
+                                  capstyle=tk.ROUND, smooth=tk.TRUE)
+        self.last_x = x
+        self.last_y = y
+        
+    def clear_canvas(self):
+        self.canvas.delete("all")
+        self.last_x = None
+        self.last_y = None
+
+class MusicPlayer:
+    def __init__(self, parent):
+        self.parent = parent
+        self.setup_ui()
+        self.playlist = []
+        self.current_track = 0
+        self.playing = False
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="🎵 Музыкальный плеер", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Track info
+        self.track_label = tk.Label(main_frame, text="Выберите трек", 
+                                   bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 12))
+        self.track_label.pack(pady=5)
+        
+        # Progress
+        self.progress = tk.Scale(main_frame, from_=0, to=100, orient="horizontal",
+                               bg=WINDOW_BG, fg=TEXT, highlightbackground=WINDOW_BG)
+        self.progress.pack(fill="x", padx=20, pady=10)
+        
+        # Controls
+        controls_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        controls_frame.pack(pady=20)
+        
+        self.play_btn = tk.Button(controls_frame, text="▶️", font=("Segoe UI Emoji", 20),
+                                bg=MENU_ITEM, fg=TEXT, command=self.toggle_play)
+        self.play_btn.pack(side="left", padx=10)
+        
+        tk.Button(controls_frame, text="⏮️", font=("Segoe UI Emoji", 16),
+                 bg=MENU_ITEM, fg=TEXT, command=self.previous_track).pack(side="left", padx=10)
+        
+        tk.Button(controls_frame, text="⏭️", font=("Segoe UI Emoji", 16),
+                 bg=MENU_ITEM, fg=TEXT, command=self.next_track).pack(side="left", padx=10)
+        
+        # Volume
+        volume_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        volume_frame.pack(pady=10)
+        
+        tk.Label(volume_frame, text="Громкость:", bg=WINDOW_BG, fg=TEXT).pack(side="left")
+        self.volume = tk.Scale(volume_frame, from_=0, to=100, orient="horizontal",
+                             bg=WINDOW_BG, fg=TEXT, highlightbackground=WINDOW_BG)
+        self.volume.set(50)
+        self.volume.pack(side="left", padx=10)
+        
+        # Playlist
+        playlist_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        playlist_frame.pack(expand=True, fill="both", pady=10)
+        
+        tk.Label(playlist_frame, text="Плейлист:", bg=WINDOW_BG, fg=TEXT, 
+                font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        
+        self.playlist_listbox = tk.Listbox(playlist_frame, bg="#1b1820", fg=TEXT,
+                                         selectbackground=MENU_ITEM)
+        self.playlist_listbox.pack(expand=True, fill="both", pady=5)
+        
+        # Add demo tracks
+        self.playlist = [
+            "🎵 Легендарная мелодия 1",
+            "🎵 Эпический саундтрек 2", 
+            "🎵 Романтическая композиция 3",
+            "🎵 Энергичный бит 4",
+            "🎵 Спокойная музыка 5"
+        ]
+        
+        for track in self.playlist:
+            self.playlist_listbox.insert(tk.END, track)
+            
+        self.playlist_listbox.bind("<<ListboxSelect>>", self.select_track)
+        
+    def toggle_play(self):
+        self.playing = not self.playing
+        if self.playing:
+            self.play_btn.config(text="⏸️")
+            self.simulate_playback()
+        else:
+            self.play_btn.config(text="▶️")
+            
+    def simulate_playback(self):
+        if self.playing:
+            current = self.progress.get()
+            if current < 100:
+                self.progress.set(current + 1)
+                self.parent.after(100, self.simulate_playback)
+            else:
+                self.playing = False
+                self.play_btn.config(text="▶️")
+                
+    def previous_track(self):
+        self.current_track = (self.current_track - 1) % len(self.playlist)
+        self.update_track_info()
+        
+    def next_track(self):
+        self.current_track = (self.current_track + 1) % len(self.playlist)
+        self.update_track_info()
+        
+    def select_track(self, event):
+        selection = self.playlist_listbox.curselection()
+        if selection:
+            self.current_track = selection[0]
+            self.update_track_info()
+            
+    def update_track_info(self):
+        self.track_label.config(text=f"Сейчас играет: {self.playlist[self.current_track]}")
+        self.progress.set(0)
+        if self.playing:
+            self.simulate_playback()
+
+class WeatherApp:
+    def __init__(self, parent):
+        self.parent = parent
+        self.cities = ["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", "Казань"]
+        self.setup_ui()
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="📊 Погода", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # City selection and search
+        city_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        city_frame.pack(fill="x", pady=10)
+        
+        # Search frame
+        search_frame = tk.Frame(city_frame, bg=WINDOW_BG)
+        search_frame.pack(fill="x", pady=5)
+        
+        tk.Label(search_frame, text="Поиск города:", bg=WINDOW_BG, fg=TEXT).pack(side="left")
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(search_frame, textvariable=self.search_var, 
+                                   bg="#1b1820", fg=TEXT, font=TEXT_FONT, width=25)
+        self.search_entry.pack(side="left", padx=10)
+        
+        search_btn = tk.Button(search_frame, text="🔍 Поиск", bg=MENU_ITEM, fg=TEXT,
+                             command=self.search_weather)
+        search_btn.pack(side="left", padx=5)
+        
+        # City selection frame
+        selection_frame = tk.Frame(city_frame, bg=WINDOW_BG)
+        selection_frame.pack(fill="x", pady=5)
+        
+        tk.Label(selection_frame, text="Быстрый выбор:", bg=WINDOW_BG, fg=TEXT).pack(side="left")
+        self.city_var = tk.StringVar(value=self.cities[0])
+        city_menu = tk.OptionMenu(selection_frame, self.city_var, *self.cities)
+        city_menu.config(bg=MENU_ITEM, fg=TEXT, highlightbackground=WINDOW_BG)
+        city_menu.pack(side="left", padx=10)
+        
+        update_btn = tk.Button(selection_frame, text="Обновить", bg=MENU_ITEM, fg=TEXT,
+                             command=self.update_weather)
+        update_btn.pack(side="left", padx=10)
+        
+        # Weather display
+        self.weather_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        self.weather_frame.pack(expand=True, fill="both", pady=20)
+        
+        # Bind Enter key to search
+        self.search_entry.bind("<Return>", lambda e: self.search_weather())
+        
+        self.update_weather()
+        
+    def search_weather(self):
+        """Поиск погоды по названию города"""
+        city = self.search_var.get().strip()
+        if not city:
+            return
+            
+        # Clear previous weather
+        for widget in self.weather_frame.winfo_children():
+            widget.destroy()
+            
+        # Show loading
+        loading_label = tk.Label(self.weather_frame, text=f"Поиск погоды для: {city}...", 
+                               bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 12))
+        loading_label.pack(pady=20)
+        
+        # Update the display
+        self.parent.update()
+        
+        # Simulate API call with random data
+        self.parent.after(1000, lambda: self.show_searched_weather(city))
+        
+    def show_searched_weather(self, city):
+        """Показать погоду для найденного города"""
+        for widget in self.weather_frame.winfo_children():
+            widget.destroy()
+            
+        # Generate random weather data for searched city
+        temps = [-15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 35, 40]
+        conditions = ["☀️ Солнечно", "⛅ Облачно", "🌧️ Дождь", "❄️ Снег", "🌤️ Переменная облачность", 
+                     "🌫️ Туман", "⛈️ Гроза", "🌦️ Небольшой дождь"]
+        winds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20]
+        
+        # Current weather for searched city
+        current_temp = random.choice(temps)
+        current_condition = random.choice(conditions)
+        current_wind = random.choice(winds)
+        current_humidity = random.randint(30, 90)
+        current_pressure = random.randint(980, 1030)
+        
+        # Current weather frame
+        current_frame = tk.Frame(self.weather_frame, bg=MENU_ITEM, relief="ridge", bd=2)
+        current_frame.pack(fill="x", pady=10, padx=20)
+        
+        tk.Label(current_frame, text=f"🏙️ {city.title()}", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 16, "bold")).pack(pady=8)
+        
+        # Temperature and condition
+        temp_frame = tk.Frame(current_frame, bg=MENU_ITEM)
+        temp_frame.pack(pady=5)
+        
+        tk.Label(temp_frame, text=f"🌡️ {current_temp}°C", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 24, "bold")).pack(side="left", padx=20)
+        
+        tk.Label(temp_frame, text=current_condition, bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 16)).pack(side="left", padx=20)
+        
+        # Additional weather info
+        info_frame = tk.Frame(current_frame, bg=MENU_ITEM)
+        info_frame.pack(pady=10)
+        
+        tk.Label(info_frame, text=f"💨 Ветер: {current_wind} м/с", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 12)).pack(side="left", padx=15)
+                
+        tk.Label(info_frame, text=f"💧 Влажность: {current_humidity}%", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 12)).pack(side="left", padx=15)
+                
+        tk.Label(info_frame, text=f"📊 Давление: {current_pressure} гПа", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 12)).pack(side="left", padx=15)
+        
+        # Forecast for searched city
+        forecast_frame = tk.Frame(self.weather_frame, bg=WINDOW_BG)
+        forecast_frame.pack(fill="x", pady=20)
+        
+        tk.Label(forecast_frame, text="Прогноз на 5 дней:", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack()
+        
+        days_frame = tk.Frame(forecast_frame, bg=WINDOW_BG)
+        days_frame.pack(fill="x", pady=10)
+        
+        days = ["Сегодня", "Завтра", "Послезавтра", "Через 3 дня", "Через 4 дня"]
+        
+        for i, day in enumerate(days):
+            day_frame = tk.Frame(days_frame, bg=MENU_ITEM, relief="ridge", bd=1)
+            day_frame.pack(side="left", expand=True, fill="both", padx=2)
+            
+            day_temp = current_temp + random.randint(-8, 8)
+            day_condition = random.choice(conditions)
+            day_temp_min = day_temp - random.randint(2, 6)
+            day_temp_max = day_temp + random.randint(2, 6)
+            
+            tk.Label(day_frame, text=day, bg=MENU_ITEM, fg=TEXT, 
+                    font=("Segoe UI", 10, "bold")).pack(pady=8)
+            tk.Label(day_frame, text=f"{day_temp_min}° / {day_temp_max}°", bg=MENU_ITEM, fg=TEXT,
+                    font=("Segoe UI", 12)).pack(pady=2)
+            tk.Label(day_frame, text=day_condition, bg=MENU_ITEM, fg=TEXT,
+                    font=("Segoe UI", 8)).pack(pady=5)
+                    
+        # Add to quick selection if not already there
+        if city.title() not in self.cities:
+            self.cities.append(city.title())
+            # Update the dropdown menu (this is simplified - in real app would need to recreate menu)
+        
+    def update_weather(self):
+        for widget in self.weather_frame.winfo_children():
+            widget.destroy()
+            
+        city = self.city_var.get()
+        
+        # Generate random weather data
+        temps = [-5, 0, 5, 10, 15, 20, 25, 30]
+        conditions = ["☀️ Солнечно", "⛅ Облачно", "🌧️ Дождь", "❄️ Снег", "🌤️ Переменная облачность"]
+        winds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        
+        # Current weather
+        current_temp = random.choice(temps)
+        current_condition = random.choice(conditions)
+        current_wind = random.choice(winds)
+        current_humidity = random.randint(30, 90)
+        
+        # Current weather frame
+        current_frame = tk.Frame(self.weather_frame, bg=MENU_ITEM, relief="ridge", bd=2)
+        current_frame.pack(fill="x", pady=10, padx=20)
+        
+        tk.Label(current_frame, text=f"🏙️ {city}", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack(pady=5)
+        
+        tk.Label(current_frame, text=f"🌡️ {current_temp}°C", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 18, "bold")).pack(pady=5)
+        
+        tk.Label(current_frame, text=current_condition, bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 12)).pack(pady=2)
+                
+        tk.Label(current_frame, text=f"💨 Ветер: {current_wind} м/с", bg=MENU_ITEM, fg=TEXT).pack(pady=2)
+        tk.Label(current_frame, text=f"💧 Влажность: {current_humidity}%", bg=MENU_ITEM, fg=TEXT).pack(pady=2)
+        
+        # Forecast
+        forecast_frame = tk.Frame(self.weather_frame, bg=WINDOW_BG)
+        forecast_frame.pack(fill="x", pady=20)
+        
+        tk.Label(forecast_frame, text="Прогноз на 5 дней:", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 12, "bold")).pack()
+        
+        days_frame = tk.Frame(forecast_frame, bg=WINDOW_BG)
+        days_frame.pack(fill="x", pady=10)
+        
+        days = ["Сегодня", "Завтра", "Послезавтра", "Через 3 дня", "Через 4 дня"]
+        
+        for i, day in enumerate(days):
+            day_frame = tk.Frame(days_frame, bg=MENU_ITEM, relief="ridge", bd=1)
+            day_frame.pack(side="left", expand=True, fill="both", padx=2)
+            
+            day_temp = current_temp + random.randint(-5, 5)
+            day_condition = random.choice(conditions)
+            
+            tk.Label(day_frame, text=day, bg=MENU_ITEM, fg=TEXT, 
+                    font=("Segoe UI", 10, "bold")).pack(pady=5)
+            tk.Label(day_frame, text=f"{day_temp}°C", bg=MENU_ITEM, fg=TEXT).pack(pady=2)
+            tk.Label(day_frame, text=day_condition, bg=MENU_ITEM, fg=TEXT,
+                    font=("Segoe UI", 8)).pack(pady=2)
+
+class ConverterApp:
+    def __init__(self, parent):
+        self.parent = parent
+        self.setup_ui()
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="🧮 Конвертер величин", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Conversion type
+        type_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        type_frame.pack(fill="x", pady=10)
+        
+        tk.Label(type_frame, text="Тип конвертации:", bg=WINDOW_BG, fg=TEXT).pack(side="left")
+        self.conv_type = tk.StringVar(value="length")
+        types = [("Длина", "length"), ("Вес", "weight"), ("Температура", "temperature")]
+        
+        for text, value in types:
+            tk.Radiobutton(type_frame, text=text, variable=self.conv_type, value=value,
+                          bg=WINDOW_BG, fg=TEXT, selectcolor=MENU_ITEM,
+                          command=self.update_units).pack(side="left", padx=10)
+        
+        # Input frame
+        input_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        input_frame.pack(fill="x", pady=20)
+        
+        # From unit
+        from_frame = tk.Frame(input_frame, bg=WINDOW_BG)
+        from_frame.pack(side="left", expand=True)
+        
+        tk.Label(from_frame, text="Из:", bg=WINDOW_BG, fg=TEXT).pack()
+        self.from_unit = tk.StringVar()
+        self.from_menu = tk.OptionMenu(from_frame, self.from_unit, "")
+        self.from_menu.config(bg=MENU_ITEM, fg=TEXT, width=15)
+        self.from_menu.pack(pady=5)
+        
+        self.from_value = tk.Entry(from_frame, bg="#1b1820", fg=TEXT, font=TEXT_FONT)
+        self.from_value.pack(pady=5)
+        self.from_value.bind("<KeyRelease>", self.convert)
+        
+        # To unit
+        to_frame = tk.Frame(input_frame, bg=WINDOW_BG)
+        to_frame.pack(side="right", expand=True)
+        
+        tk.Label(to_frame, text="В:", bg=WINDOW_BG, fg=TEXT).pack()
+        self.to_unit = tk.StringVar()
+        self.to_menu = tk.OptionMenu(to_frame, self.to_unit, "")
+        self.to_menu.config(bg=MENU_ITEM, fg=TEXT, width=15)
+        self.to_menu.pack(pady=5)
+        
+        self.result_label = tk.Label(to_frame, text="0", bg=WINDOW_BG, fg=TEXT,
+                                   font=("Segoe UI", 14, "bold"))
+        self.result_label.pack(pady=5)
+        
+        # Swap button
+        swap_btn = tk.Button(main_frame, text="↔️ Поменять местами", bg=MENU_ITEM, fg=TEXT,
+                           command=self.swap_units)
+        swap_btn.pack(pady=10)
+        
+        self.update_units()
+        
+    def update_units(self):
+        conv_type = self.conv_type.get()
+        
+        if conv_type == "length":
+            units = ["Метры", "Километры", "Сантиметры", "Мили", "Футы", "Дюймы"]
+        elif conv_type == "weight":
+            units = ["Килограммы", "Граммы", "Фунты", "Унции", "Тонны"]
+        else:  # temperature
+            units = ["Цельсий", "Фаренгейт", "Кельвин"]
+            
+        # Update menus
+        self.from_menu['menu'].delete(0, 'end')
+        self.to_menu['menu'].delete(0, 'end')
+        
+        for unit in units:
+            self.from_menu['menu'].add_command(label=unit, command=tk._setit(self.from_unit, unit))
+            self.to_menu['menu'].add_command(label=unit, command=tk._setit(self.to_unit, unit))
+            
+        self.from_unit.set(units[0])
+        self.to_unit.set(units[1] if len(units) > 1 else units[0])
+        
+    def swap_units(self):
+        from_unit = self.from_unit.get()
+        to_unit = self.to_unit.get()
+        self.from_unit.set(to_unit)
+        self.to_unit.set(from_unit)
+        self.convert()
+        
+    def convert(self, event=None):
+        try:
+            value = float(self.from_value.get() or 0)
+            from_u = self.from_unit.get()
+            to_u = self.to_unit.get()
+            conv_type = self.conv_type.get()
+            
+            result = self.do_conversion(value, from_u, to_u, conv_type)
+            self.result_label.config(text=f"{result:.4f}")
+        except ValueError:
+            self.result_label.config(text="Ошибка")
+            
+    def do_conversion(self, value, from_u, to_u, conv_type):
+        if conv_type == "length":
+            # Convert to meters first
+            to_meters = {
+                "Метры": 1,
+                "Километры": 1000,
+                "Сантиметры": 0.01,
+                "Мили": 1609.34,
+                "Футы": 0.3048,
+                "Дюймы": 0.0254
+            }
+            
+            meters = value * to_meters.get(from_u, 1)
+            return meters / to_meters.get(to_u, 1)
+            
+        elif conv_type == "weight":
+            # Convert to kg first
+            to_kg = {
+                "Килограммы": 1,
+                "Граммы": 0.001,
+                "Фунты": 0.453592,
+                "Унции": 0.0283495,
+                "Тонны": 1000
+            }
+            
+            kg = value * to_kg.get(from_u, 1)
+            return kg / to_kg.get(to_u, 1)
+            
+        else:  # temperature
+            # Convert to Celsius first
+            if from_u == "Цельсий":
+                celsius = value
+            elif from_u == "Фаренгейт":
+                celsius = (value - 32) * 5/9
+            else:  # Kelvin
+                celsius = value - 273.15
+                
+            # Convert from Celsius to target
+            if to_u == "Цельсий":
+                return celsius
+            elif to_u == "Фаренгейт":
+                return celsius * 9/5 + 32
+            else:  # Kelvin
+                return celsius + 273.15
+
+class TimerApp:
+    def __init__(self, parent):
+        self.parent = parent
+        self.setup_ui()
+        self.running = False
+        self.remaining = 0
+        self.total = 0
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="⏰ Таймер", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Time display
+        self.time_label = tk.Label(main_frame, text="00:00", bg=WINDOW_BG, fg=TEXT,
+                                 font=("Segoe UI", 48, "bold"))
+        self.time_label.pack(pady=20)
+        
+        # Input frame
+        input_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        input_frame.pack(pady=20)
+        
+        tk.Label(input_frame, text="Минуты:", bg=WINDOW_BG, fg=TEXT).pack(side="left")
+        self.minutes_entry = tk.Entry(input_frame, bg="#1b1820", fg=TEXT, width=5,
+                                    font=("Segoe UI", 12))
+        self.minutes_entry.pack(side="left", padx=5)
+        
+        tk.Label(input_frame, text="Секунды:", bg=WINDOW_BG, fg=TEXT).pack(side="left", padx=(20,0))
+        self.seconds_entry = tk.Entry(input_frame, bg="#1b1820", fg=TEXT, width=5,
+                                    font=("Segoe UI", 12))
+        self.seconds_entry.pack(side="left", padx=5)
+        
+        # Controls
+        controls_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        controls_frame.pack(pady=20)
+        
+        self.start_btn = tk.Button(controls_frame, text="Старт", bg="#4CAF50", fg="white",
+                                 font=("Segoe UI", 12), padx=20, command=self.start_timer)
+        self.start_btn.pack(side="left", padx=10)
+        
+        self.pause_btn = tk.Button(controls_frame, text="Пауза", bg="#FF9800", fg="white",
+                                 font=("Segoe UI", 12), padx=20, command=self.pause_timer,
+                                 state="disabled")
+        self.pause_btn.pack(side="left", padx=10)
+        
+        reset_btn = tk.Button(controls_frame, text="Сброс", bg="#f44336", fg="white",
+                            font=("Segoe UI", 12), padx=20, command=self.reset_timer)
+        reset_btn.pack(side="left", padx=10)
+        
+        # Progress
+        self.progress = ttk.Progressbar(main_frame, orient="horizontal", length=400, mode="determinate")
+        self.progress.pack(pady=20)
+        
+    def start_timer(self):
+        if not self.running:
+            try:
+                minutes = int(self.minutes_entry.get() or 0)
+                seconds = int(self.seconds_entry.get() or 0)
+                self.total = minutes * 60 + seconds
+                self.remaining = self.total
+                
+                if self.remaining > 0:
+                    self.running = True
+                    self.start_btn.config(state="disabled")
+                    self.pause_btn.config(state="normal")
+                    self.update_timer()
+            except ValueError:
+                pass
+        else:
+            self.running = True
+            self.start_btn.config(state="disabled")
+            self.pause_btn.config(state="normal")
+            self.update_timer()
+            
+    def pause_timer(self):
+        self.running = False
+        self.start_btn.config(state="normal")
+        self.pause_btn.config(state="disabled")
+        
+    def reset_timer(self):
+        self.running = False
+        self.remaining = 0
+        self.total = 0
+        self.time_label.config(text="00:00")
+        self.progress["value"] = 0
+        self.start_btn.config(state="normal")
+        self.pause_btn.config(state="disabled")
+        
+    def update_timer(self):
+        if self.running and self.remaining > 0:
+            minutes = self.remaining // 60
+            seconds = self.remaining % 60
+            self.time_label.config(text=f"{minutes:02d}:{seconds:02d}")
+            
+            # Update progress
+            if self.total > 0:
+                progress = 100 * (self.total - self.remaining) / self.total
+                self.progress["value"] = progress
+                
+            self.remaining -= 1
+            self.parent.after(1000, self.update_timer)
+        elif self.remaining <= 0 and self.total > 0:
+            self.time_label.config(text="00:00")
+            self.progress["value"] = 100
+            self.running = False
+            self.start_btn.config(state="normal")
+            self.pause_btn.config(state="disabled")
+            # Show completion message
+            self.show_completion()
+            
+    def show_completion(self):
+        completion_win = tk.Toplevel(self.parent)
+        completion_win.title("Таймер")
+        completion_win.geometry("300x150")
+        completion_win.configure(bg=WINDOW_BG)
+        completion_win.resizable(False, False)
+        
+        tk.Label(completion_win, text="⏰ Время вышло!", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 16, "bold")).pack(expand=True)
+        
+        tk.Button(completion_win, text="OK", bg=MENU_ITEM, fg=TEXT,
+                 command=completion_win.destroy).pack(pady=10)
+
+class TextEditor:
+    def __init__(self, parent):
+        self.parent = parent
+        self.filename = None
+        self.setup_ui()
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Menu bar
+        menubar = tk.Frame(main_frame, bg=MENU_ITEM, height=30)
+        menubar.pack(fill="x", pady=(0,10))
+        menubar.pack_propagate(False)
+        
+        # File menu
+        file_btn = tk.Menubutton(menubar, text="Файл", bg=MENU_ITEM, fg=TEXT)
+        file_btn.pack(side="left")
+        file_menu = tk.Menu(file_btn, tearoff=0, bg=MENU_BG, fg=TEXT)
+        file_btn.config(menu=file_menu)
+        file_menu.add_command(label="Новый", command=self.new_file)
+        file_menu.add_command(label="Открыть", command=self.open_file)
+        file_menu.add_command(label="Сохранить", command=self.save_file)
+        file_menu.add_command(label="Сохранить как", command=self.save_as_file)
+        
+        # Edit menu
+        edit_btn = tk.Menubutton(menubar, text="Правка", bg=MENU_ITEM, fg=TEXT)
+        edit_btn.pack(side="left")
+        edit_menu = tk.Menu(edit_btn, tearoff=0, bg=MENU_BG, fg=TEXT)
+        edit_btn.config(menu=edit_menu)
+        edit_menu.add_command(label="Вырезать", command=self.cut_text)
+        edit_menu.add_command(label="Копировать", command=self.copy_text)
+        edit_menu.add_command(label="Вставить", command=self.paste_text)
+        
+        # Text area
+        text_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        text_frame.pack(expand=True, fill="both")
+        
+        self.text_area = tk.Text(text_frame, bg="#1b1820", fg=TEXT, wrap="word",
+                               font=("Consolas", 11), undo=True)
+        
+        scrollbar = tk.Scrollbar(text_frame, command=self.text_area.yview)
+        self.text_area.config(yscrollcommand=scrollbar.set)
+        
+        self.text_area.pack(side="left", expand=True, fill="both")
+        scrollbar.pack(side="right", fill="y")
+        
+        # Status bar
+        self.status_bar = tk.Label(main_frame, text="Готов", bg=MENU_ITEM, fg=TEXT,
+                                 anchor="w")
+        self.status_bar.pack(fill="x", pady=(10,0))
+        
+        # Bind events
+        self.text_area.bind("<KeyRelease>", self.update_status)
+        
+    def new_file(self):
+        self.text_area.delete(1.0, tk.END)
+        self.filename = None
+        self.status_bar.config(text="Новый файл")
+        
+    def open_file(self):
+        filename = tk.filedialog.askopenfilename(
+            title="Открыть файл",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    self.text_area.delete(1.0, tk.END)
+                    self.text_area.insert(1.0, content)
+                    self.filename = filename
+                    self.status_bar.config(text=f"Открыт: {filename}")
+            except Exception as e:
+                tk.messagebox.showerror("Ошибка", f"Не удалось открыть файл: {str(e)}")
+                
+    def save_file(self):
+        if self.filename:
+            try:
+                with open(self.filename, 'w', encoding='utf-8') as file:
+                    content = self.text_area.get(1.0, tk.END)
+                    file.write(content)
+                    self.status_bar.config(text=f"Сохранено: {self.filename}")
+            except Exception as e:
+                tk.messagebox.showerror("Ошибка", f"Не удалось сохранить файл: {str(e)}")
+        else:
+            self.save_as_file()
+            
+    def save_as_file(self):
+        filename = tk.filedialog.asksaveasfilename(
+            title="Сохранить как",
+            defaultextension=".txt",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if filename:
+            self.filename = filename
+            self.save_file()
+            
+    def cut_text(self):
+        self.text_area.event_generate("<<Cut>>")
+        
+    def copy_text(self):
+        self.text_area.event_generate("<<Copy>>")
+        
+    def paste_text(self):
+        self.text_area.event_generate("<<Paste>>")
+        
+    def update_status(self, event=None):
+        text = self.text_area.get(1.0, tk.END)
+        lines = text.count('\n')
+        words = len(text.split())
+        chars = len(text.replace('\n', ''))
+        self.status_bar.config(text=f"Строк: {lines} | Слов: {words} | Символов: {chars}")
+
+class GamesCollection:
+    def __init__(self, parent):
+        self.parent = parent
+        self.setup_ui()
+        
+    def setup_ui(self):
+        main_frame = tk.Frame(self.parent, bg=WINDOW_BG)
+        main_frame.pack(expand=True, fill="both", padx=12, pady=12)
+        
+        # Title
+        title_label = tk.Label(main_frame, text="🎲 Коллекция игр", 
+                              bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
+        title_label.pack(pady=10)
+        
+        # Games grid
+        games_frame = tk.Frame(main_frame, bg=WINDOW_BG)
+        games_frame.pack(expand=True, fill="both", pady=20)
+        
+        games = [
+            ("🎯", "Попади в цель", self.target_game),
+            ("🎲", "Кости", self.dice_game),
+            ("🔢", "Угадай число", self.guess_number),
+            ("🎮", "Змейка", self.snake_game),
+            ("🧩", "Пазл", self.puzzle_game),
+            ("🎴", "Память", self.memory_game),
+        ]
+        
+        for i, (emoji, name, command) in enumerate(games):
+            btn = tk.Button(games_frame, text=f"{emoji}\n{name}", 
+                          bg=MENU_ITEM, fg=TEXT, font=("Segoe UI", 12),
+                          command=command, width=12, height=4)
+            btn.grid(row=i//3, column=i%3, padx=10, pady=10)
+            
+    def target_game(self):
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Попади в цель")
+        game_win.geometry("400x400")
+        game_win.configure(bg=WINDOW_BG)
+        
+        canvas = tk.Canvas(game_win, bg=WINDOW_BG, highlightthickness=0)
+        canvas.pack(expand=True, fill="both")
+        
+        score = 0
+        target = None
+        
+        def create_target():
+            nonlocal target
+            x = random.randint(50, 350)
+            y = random.randint(50, 350)
+            target = canvas.create_oval(x-20, y-20, x+20, y+20, fill="red", tags="target")
+            
+        def on_click(event):
+            nonlocal score
+            items = canvas.find_overlapping(event.x-5, event.y-5, event.x+5, event.y+5)
+            if target in items:
+                canvas.delete("target")
+                score += 1
+                score_label.config(text=f"Очки: {score}")
+                create_target()
+                
+        canvas.bind("<Button-1>", on_click)
+        
+        score_label = tk.Label(game_win, text="Очки: 0", bg=WINDOW_BG, fg=TEXT)
+        score_label.pack()
+        
+        create_target()
+        
+    def dice_game(self):
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Кости")
+        game_win.geometry("300x200")
+        game_win.configure(bg=WINDOW_BG)
+        
+        def roll_dice():
+            result = random.randint(1, 6)
+            result_label.config(text=f"🎲 Выпало: {result}")
+            
+        tk.Label(game_win, text="Бросок костей", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack(pady=20)
+                
+        result_label = tk.Label(game_win, text="🎲 Нажмите 'Бросить'", bg=WINDOW_BG, fg=TEXT,
+                              font=("Segoe UI", 16))
+        result_label.pack(pady=20)
+        
+        tk.Button(game_win, text="Бросить кости", bg=MENU_ITEM, fg=TEXT,
+                 command=roll_dice).pack(pady=10)
+                 
+    def guess_number(self):
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Угадай число")
+        game_win.geometry("300x250")
+        game_win.configure(bg=WINDOW_BG)
+        
+        number = random.randint(1, 100)
+        attempts = 0
+        
+        def check_guess():
+            nonlocal attempts
+            try:
+                guess = int(entry.get())
+                attempts += 1
+                
+                if guess < number:
+                    result_label.config(text="📈 Загаданное число больше!")
+                elif guess > number:
+                    result_label.config(text="📉 Загаданное число меньше!")
+                else:
+                    result_label.config(text=f"🎉 Правильно! Попыток: {attempts}")
+                    entry.config(state="disabled")
+                    check_btn.config(state="disabled")
+            except ValueError:
+                result_label.config(text="Введите число!")
+                
+        def new_game():
+            nonlocal number, attempts
+            number = random.randint(1, 100)
+            attempts = 0
+            entry.config(state="normal")
+            check_btn.config(state="normal")
+            entry.delete(0, tk.END)
+            result_label.config(text="Угадайте число от 1 до 100")
+            
+        tk.Label(game_win, text="Угадай число (1-100)", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack(pady=10)
+                
+        entry = tk.Entry(game_win, bg="#1b1820", fg=TEXT, font=("Segoe UI", 12))
+        entry.pack(pady=10)
+        
+        result_label = tk.Label(game_win, text="Угадайте число от 1 до 100", 
+                              bg=WINDOW_BG, fg=TEXT)
+        result_label.pack(pady=10)
+        
+        check_btn = tk.Button(game_win, text="Проверить", bg=MENU_ITEM, fg=TEXT,
+                            command=check_guess)
+        check_btn.pack(pady=5)
+        
+        tk.Button(game_win, text="Новая игра", bg=MENU_ITEM, fg=TEXT,
+                 command=new_game).pack(pady=5)
+                 
+    def snake_game(self):
+        # Простая реализация змейки
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Змейка")
+        game_win.geometry("400x400")
+        game_win.configure(bg=WINDOW_BG)
+        
+        canvas = tk.Canvas(game_win, bg="black", highlightthickness=0)
+        canvas.pack(expand=True, fill="both")
+        
+        # Простое сообщение о том, что игра в разработке
+        canvas.create_text(200, 200, text="🐍 Змейка в разработке!\n\nЭта игра появится\nв следующем обновлении!", 
+                         fill="white", font=("Segoe UI", 14), justify="center")
+                         
+    def puzzle_game(self):
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Пазл")
+        game_win.geometry("300x200")
+        game_win.configure(bg=WINDOW_BG)
+        
+        tk.Label(game_win, text="🧩 Игра 'Пазл'", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack(expand=True)
+        tk.Label(game_win, text="В разработке", bg=WINDOW_BG, fg=TEXT).pack()
+        
+    def memory_game(self):
+        game_win = tk.Toplevel(self.parent)
+        game_win.title("Память")
+        game_win.geometry("300x200")
+        game_win.configure(bg=WINDOW_BG)
+        
+        tk.Label(game_win, text="🎴 Игра 'Память'", bg=WINDOW_BG, fg=TEXT,
+                font=("Segoe UI", 14, "bold")).pack(expand=True)
+        tk.Label(game_win, text="В разработке", bg=WINDOW_BG, fg=TEXT).pack()
+
+# ------------------ Build functions for new apps ------------------
+
+def build_paint(parent):
+    paint = PaintApp(parent)
+    return paint
+
+def build_music(parent):
+    music = MusicPlayer(parent)
+    return music
+
+def build_weather(parent):
+    weather = WeatherApp(parent)
+    return weather
+
+def build_converter(parent):
+    converter = ConverterApp(parent)
+    return converter
+
+def build_timer(parent):
+    timer = TimerApp(parent)
+    return timer
+
+def build_text_editor(parent):
+    editor = TextEditor(parent)
+    return editor
+
+def build_games(parent):
+    games = GamesCollection(parent)
+    return games
+
+def build_camera(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="📷 Камера", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    # Имитация камеры
+    camera_frame = tk.Frame(frame, bg="black", width=400, height=300)
+    camera_frame.pack(pady=20)
+    camera_frame.pack_propagate(False)
+    
+    tk.Label(camera_frame, text="📷 Камера\n\nДля использования реальной камеры\nтребуется подключение устройства", 
+            bg="black", fg="white", font=("Segoe UI", 12), justify="center").pack(expand=True)
+    
+    controls = tk.Frame(frame, bg=WINDOW_BG)
+    controls.pack(pady=20)
+    
+    tk.Button(controls, text="📸 Сделать снимок", bg=MENU_ITEM, fg=TEXT,
+             command=lambda: tk.messagebox.showinfo("Камера", "Снимок сохранен!")).pack(side="left", padx=10)
+    
+    tk.Button(controls, text="🎥 Записать видео", bg=MENU_ITEM, fg=TEXT,
+             command=lambda: tk.messagebox.showinfo("Камера", "Запись начата!")).pack(side="left", padx=10)
+    
+    return frame
+
+def build_search(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="🔍 Умный поиск", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    search_frame = tk.Frame(frame, bg=WINDOW_BG)
+    search_frame.pack(fill="x", pady=20, padx=50)
+    
+    search_var = tk.StringVar()
+    search_entry = tk.Entry(search_frame, textvariable=search_var, bg="#1b1820", fg=TEXT,
+                          font=("Segoe UI", 12), width=40)
+    search_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+    
+    def perform_search():
+        query = search_var.get().lower()
+        results = [
+            "📁 Файлы: найдено 3 совпадения",
+            "🌐 Веб: 15 результатов в браузере", 
+            "📝 Заметки: 2 совпадения",
+            "🎵 Музыка: 1 трек",
+            "🖼️ Фото: 7 изображений"
+        ]
+        
+        for widget in results_frame.winfo_children():
+            widget.destroy()
+            
+        for result in results:
+            tk.Label(results_frame, text=result, bg=WINDOW_BG, fg=TEXT,
+                   font=("Segoe UI", 10)).pack(anchor="w", pady=2)
+    
+    tk.Button(search_frame, text="Искать", bg=MENU_ITEM, fg=TEXT,
+             command=perform_search).pack(side="right")
+    
+    results_frame = tk.Frame(frame, bg=WINDOW_BG)
+    results_frame.pack(fill="both", expand=True, pady=20)
+    
+    search_entry.bind("<Return>", lambda e: perform_search())
+    
+    return frame
+
+def build_gallery(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="🖼️ Галерея изображений", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    # Сетка изображений
+    gallery_frame = tk.Frame(frame, bg=WINDOW_BG)
+    gallery_frame.pack(expand=True, fill="both")
+    
+    # Заглушки для изображений
+    for i in range(6):
+        img_frame = tk.Frame(gallery_frame, bg=MENU_ITEM, width=150, height=150, relief="ridge", bd=2)
+        img_frame.grid(row=i//3, column=i%3, padx=10, pady=10)
+        img_frame.pack_propagate(False)
+        
+        tk.Label(img_frame, text=f"Изображение {i+1}", bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 10)).pack(expand=True)
+    
+    return frame
+
+def build_settings(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="⚙️ Настройки системы", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    settings_frame = tk.Frame(frame, bg=WINDOW_BG)
+    settings_frame.pack(fill="both", expand=True, pady=20)
+    
+    # Настройки внешнего вида
+    appearance_frame = tk.LabelFrame(settings_frame, text="Внешний вид", bg=WINDOW_BG, fg=TEXT,
+                                   font=("Segoe UI", 12, "bold"))
+    appearance_frame.pack(fill="x", pady=10, padx=20)
+    
+    tk.Checkbutton(appearance_frame, text="Темная тема", bg=WINDOW_BG, fg=TEXT,
+                  selectcolor=MENU_ITEM).pack(anchor="w", pady=5)
+    
+    tk.Checkbutton(appearance_frame, text="Показывать анимации", bg=WINDOW_BG, fg=TEXT,
+                  selectcolor=MENU_ITEM).pack(anchor="w", pady=5)
+    
+    # Настройки системы
+    system_frame = tk.LabelFrame(settings_frame, text="Система", bg=WINDOW_BG, fg=TEXT,
+                               font=("Segoe UI", 12, "bold"))
+    system_frame.pack(fill="x", pady=10, padx=20)
+    
+    tk.Checkbutton(system_frame, text="Автозагрузка", bg=WINDOW_BG, fg=TEXT,
+                  selectcolor=MENU_ITEM).pack(anchor="w", pady=5)
+    
+    tk.Checkbutton(system_frame, text="Уведомления", bg=WINDOW_BG, fg=TEXT,
+                  selectcolor=MENU_ITEM).pack(anchor="w", pady=5)
+    
+    return frame
+
+def build_books(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="📚 Электронная библиотека", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    books_frame = tk.Frame(frame, bg=WINDOW_BG)
+    books_frame.pack(expand=True, fill="both", pady=20)
+    
+    books = [
+        "📖 Война и мир - Л. Толстой",
+        "📖 Преступление и наказание - Ф. Достоевский", 
+        "📖 Мастер и Маргарита - М. Булгаков",
+        "📖 1984 - Дж. Оруэлл",
+        "📖 Гарри Поттер - Дж. Роулинг",
+        "📖 Властелин колец - Дж. Толкин"
+    ]
+    
+    for book in books:
+        book_frame = tk.Frame(books_frame, bg=MENU_ITEM, relief="ridge", bd=1)
+        book_frame.pack(fill="x", pady=5, padx=50)
+        
+        tk.Label(book_frame, text=book, bg=MENU_ITEM, fg=TEXT,
+                font=("Segoe UI", 11)).pack(pady=8)
+    
+    return frame
+
+def build_task_manager(parent):
+    frame = tk.Frame(parent, bg=WINDOW_BG)
+    frame.pack(expand=True, fill="both", padx=12, pady=12)
+    
+    tk.Label(frame, text="🗂️ Диспетчер задач", bg=WINDOW_BG, fg=TEXT,
+            font=("Segoe UI", 16, "bold")).pack(pady=20)
+    
+    # Список процессов
+    tree = ttk.Treeview(frame, columns=("PID", "Name", "CPU", "Memory"), show="headings", height=15)
+    tree.heading("PID", text="PID")
+    tree.heading("Name", text="Имя процесса")
+    tree.heading("CPU", text="CPU %")
+    tree.heading("Memory", text="Память")
+    
+    tree.column("PID", width=80)
+    tree.column("Name", width=200)
+    tree.column("CPU", width=80)
+    tree.column("Memory", width=100)
+    
+    # Демо-процессы
+    processes = [
+        ("1001", "system", "2%", "45 MB"),
+        ("1002", "explorer", "5%", "120 MB"),
+        ("1003", "browser", "15%", "450 MB"),
+        ("1004", "music_player", "3%", "85 MB"),
+        ("1005", "text_editor", "2%", "65 MB")
+    ]
+    
+    for proc in processes:
+        tree.insert("", "end", values=proc)
+    
+    tree.pack(expand=True, fill="both", padx=20, pady=10)
+    
+    # Кнопки управления
+    controls = tk.Frame(frame, bg=WINDOW_BG)
+    controls.pack(fill="x", pady=10, padx=20)
+    
+    tk.Button(controls, text="🔄 Обновить", bg=MENU_ITEM, fg=TEXT).pack(side="left", padx=5)
+    tk.Button(controls, text="⏹️ Завершить", bg="#ff4444", fg="white").pack(side="left", padx=5)
+    
+    return frame
+
 # ------------------ Real Browser Functionality ------------------
+class SimpleBrowser(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        
+        # Создаем веб-движок
+        self.browser = QWebEngineView()
+        self.browser.setUrl(QUrl("https://www.google.com"))
+        
+        # Панель инструментов
+        toolbar = QToolBar()
+        self.addToolBar(toolbar)
+        
+        # Кнопки навигации
+        back_btn = QAction("Назад", self)
+        back_btn.triggered.connect(self.browser.back)
+        toolbar.addAction(back_btn)
+        
+        forward_btn = QAction("Вперед", self)
+        forward_btn.triggered.connect(self.browser.forward)
+        toolbar.addAction(forward_btn)
+        
+        reload_btn = QAction("Обновить", self)
+        reload_btn.triggered.connect(self.browser.reload)
+        toolbar.addAction(reload_btn)
+        
+        home_btn = QAction("Домой", self)
+        home_btn.triggered.connect(self.navigate_home)
+        toolbar.addAction(home_btn)
+        
+        # Адресная строка
+        self.url_bar = QLineEdit()
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
+        toolbar.addWidget(self.url_bar)
+        
+        # Обновление URL
+        self.browser.urlChanged.connect(self.update_url)
+        
+        self.setCentralWidget(self.browser)
+        self.setWindowTitle("Простой браузер на Python")
+        self.show()
+    
+    def navigate_home(self):
+        self.browser.setUrl(QUrl("https://www.google.com"))
+    
+    def navigate_to_url(self):
+        url = self.url_bar.text()
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        self.browser.setUrl(QUrl(url))
+    
+    def update_url(self, q):
+        self.url_bar.setText(q.toString())
+
 def build_browser(parent):
     """Создает интерфейс браузера в окне Flolower OS"""
     
@@ -768,73 +2071,9 @@ def build_browser(parent):
         
         def create_qt_browser_interface(self, parent):
             """Создает интерфейс для реального браузера с Qt"""
-            # Панель навигации
-            nav_frame = tk.Frame(parent, bg="#2b2036", height=50)
-            nav_frame.pack(fill="x", padx=0, pady=0)
-            nav_frame.pack_propagate(False)
-            
-            # Кнопки навигации
-            nav_buttons = tk.Frame(nav_frame, bg="#2b2036")
-            nav_buttons.pack(side="left", padx=8, pady=8)
-            
-            back_btn = tk.Button(nav_buttons, text="←", bg="#3a2b45", fg=TEXT, bd=0,
-                               font=("Segoe UI", 12), width=2, command=self.launch_browser)
-            back_btn.pack(side="left", padx=2)
-            
-            forward_btn = tk.Button(nav_buttons, text="→", bg="#3a2b45", fg=TEXT, bd=0,
-                                  font=("Segoe UI", 12), width=2, command=self.launch_browser)
-            forward_btn.pack(side="left", padx=2)
-            
-            reload_btn = tk.Button(nav_buttons, text="↻", bg="#3a2b45", fg=TEXT, bd=0,
-                                 font=("Segoe UI", 12), width=2, command=self.launch_browser)
-            reload_btn.pack(side="left", padx=2)
-            
-            home_btn = tk.Button(nav_buttons, text="⌂", bg="#3a2b45", fg=TEXT, bd=0,
-                               font=("Segoe UI", 12), width=2, command=lambda: self.launch_browser("https://www.google.com"))
-            home_btn.pack(side="left", padx=2)
-            
-            # Адресная строка
-            url_frame = tk.Frame(nav_frame, bg="#2b2036")
-            url_frame.pack(side="left", fill="x", expand=True, padx=10, pady=8)
-            
-            self.url_var = tk.StringVar(value="https://www.google.com")
-            url_entry = tk.Entry(url_frame, textvariable=self.url_var, bg="#1b1820", fg=TEXT,
-                               font=TEXT_FONT, bd=1, relief="solid", insertbackground=TEXT)
-            url_entry.pack(side="left", fill="x", expand=True)
-            url_entry.bind("<Return>", lambda e: self.launch_browser())
-            
-            go_btn = tk.Button(url_frame, text="→", bg="#4d7fff", fg=TEXT, bd=0,
-                             font=("Segoe UI", 12), width=2, command=lambda: self.launch_browser())
-            go_btn.pack(side="left", padx=5)
-            
-            # Быстрый доступ к сайтам
-            quick_access_frame = tk.Frame(parent, bg=WINDOW_BG)
-            quick_access_frame.pack(fill="x", padx=12, pady=10)
-            
-            tk.Label(quick_access_frame, text="🚀 Быстрый доступ:", 
-                    bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 12, "bold")).pack(anchor="w")
-            
-            sites_frame = tk.Frame(quick_access_frame, bg=WINDOW_BG)
-            sites_frame.pack(fill="x", pady=8)
-            
-            sites = [
-                ("🔍 Google", "https://www.google.com"),
-                ("📺 YouTube", "https://www.youtube.com"),
-                ("💻 GitHub", "https://www.github.com"),
-                ("📚 Wikipedia", "https://www.wikipedia.org"),
-                ("🛒 Amazon", "https://www.amazon.com"),
-                ("💬 Reddit", "https://www.reddit.com")
-            ]
-            
-            for name, url in sites:
-                btn = tk.Button(sites_frame, text=name, bg="#2b2036", fg=TEXT, 
-                              font=TEXT_FONT, bd=0, padx=12, pady=6,
-                              command=lambda u=url: self.launch_browser(u))
-                btn.pack(side="left", padx=4, pady=2)
-            
             # Информация о браузере
             info_frame = tk.Frame(parent, bg=WINDOW_BG)
-            info_frame.pack(fill="both", expand=True, padx=12, pady=12)
+            info_frame.pack(expand=True, fill="both", padx=12, pady=12)
             
             info_text = """
 ╔══════════════════════════════════════════════════════════════╗
@@ -853,15 +2092,14 @@ def build_browser(parent):
 • Безопасное соединение (HTTPS)
 
 🚀 КАК ИСПОЛЬЗОВАТЬ:
-1. Нажмите на кнопку с сайтом для быстрого доступа
-2. Или введите любой URL в адресную строку выше
-3. Нажмите Enter или кнопку "→" для перехода
+Нажмите кнопку "Запустить браузер" ниже для открытия
+полнофункционального веб-браузера.
 
 💡 ПОДСКАЗКИ:
 • Браузер откроется в отдельном окне с полным функционалом
-• Используйте Ctrl+T для новой вкладки
-• Ctrl+D чтобы добавить в закладки
-• F5 для обновления страницы
+• Используйте кнопки навигации для перемещения по страницам
+• Вводите URL в адресную строку для перехода на сайты
+• Нажмите Enter для перехода по введенному URL
 
 🔧 ТЕХНОЛОГИИ:
 • Qt WebEngine 5.15+
@@ -875,36 +2113,17 @@ def build_browser(parent):
             text_widget.insert("1.0", info_text)
             text_widget.config(state="disabled")
             
+            # Кнопка запуска браузера
+            launch_frame = tk.Frame(parent, bg=WINDOW_BG)
+            launch_frame.pack(fill="x", pady=20)
+            
+            launch_btn = tk.Button(launch_frame, text="🚀 Запустить браузер", 
+                                 bg="#4d7fff", fg="white", font=("Segoe UI", 14, "bold"),
+                                 padx=20, pady=10, command=self.launch_browser)
+            launch_btn.pack()
+            
         def create_demo_browser_interface(self, parent):
             """Создает демо-интерфейс браузера"""
-            # Панель навигации (демо)
-            nav_frame = tk.Frame(parent, bg="#2b2036", height=50)
-            nav_frame.pack(fill="x", padx=0, pady=0)
-            nav_frame.pack_propagate(False)
-            
-            nav_buttons = tk.Frame(nav_frame, bg="#2b2036")
-            nav_buttons.pack(side="left", padx=8, pady=8)
-            
-            # Демо-кнопки
-            for btn_text in ["←", "→", "↻", "⌂"]:
-                btn = tk.Button(nav_buttons, text=btn_text, bg="#3a2b45", fg=TEXT, bd=0,
-                              font=("Segoe UI", 12), width=2, command=self.show_demo_message)
-                btn.pack(side="left", padx=2)
-            
-            # Адресная строка (демо)
-            url_frame = tk.Frame(nav_frame, bg="#2b2036")
-            url_frame.pack(side="left", fill="x", expand=True, padx=10, pady=8)
-            
-            url_entry = tk.Entry(url_frame, bg="#1b1820", fg=TEXT, font=TEXT_FONT,
-                               bd=1, relief="solid", insertbackground=TEXT)
-            url_entry.pack(side="left", fill="x", expand=True)
-            url_entry.insert(0, "https://www.google.com")
-            url_entry.bind("<Return>", lambda e: self.show_demo_message())
-            
-            go_btn = tk.Button(url_frame, text="→", bg="#4d7fff", fg=TEXT, bd=0,
-                             font=("Segoe UI", 12), width=2, command=self.show_demo_message)
-            go_btn.pack(side="left", padx=5)
-            
             # Контент демо-браузера
             content_frame = tk.Frame(parent, bg=WINDOW_BG)
             content_frame.pack(expand=True, fill="both", padx=12, pady=12)
@@ -978,116 +2197,12 @@ pip install PyQt5 PyQtWebEngine
             text_widget.insert("1.0", info_text)
             text_widget.config(state="disabled")
             
-        def launch_browser(self, url=None):
+        def launch_browser(self):
             """Запускает реальный браузер с Qt WebEngine"""
-            if not url:
-                url = self.url_var.get() if hasattr(self, 'url_var') else "https://www.google.com"
-            
             def start_qt_browser():
-                class RealBrowser(QMainWindow):
-                    def __init__(self, url):
-                        super().__init__()
-                        self.setWindowTitle(f"Flolower Browser - {url}")
-                        self.setGeometry(100, 100, 1200, 800)
-                        
-                        # Темная тема
-                        self.setStyleSheet("""
-                            QMainWindow {
-                                background-color: #0f0b18;
-                                color: white;
-                            }
-                            QToolBar {
-                                background-color: #2b2036;
-                                border: none;
-                                spacing: 5px;
-                                padding: 5px;
-                            }
-                            QLineEdit {
-                                background-color: #1b1820;
-                                color: white;
-                                border: 1px solid #4a3654;
-                                border-radius: 3px;
-                                padding: 5px;
-                                font-family: 'Segoe UI';
-                            }
-                            QPushButton {
-                                background-color: #3a2b45;
-                                color: white;
-                                border: none;
-                                border-radius: 3px;
-                                padding: 5px 10px;
-                                font-family: 'Segoe UI';
-                            }
-                            QPushButton:hover {
-                                background-color: #4a3654;
-                            }
-                        """)
-                        
-                        self.browser = QWebEngineView()
-                        self.browser.setUrl(QUrl(url))
-                        
-                        # Панель навигации
-                        navbar = QToolBar()
-                        self.addToolBar(navbar)
-                        
-                        # Кнопки навигации
-                        back_btn = QPushButton("←")
-                        back_btn.setFixedSize(30, 30)
-                        back_btn.clicked.connect(self.browser.back)
-                        navbar.addWidget(back_btn)
-                        
-                        forward_btn = QPushButton("→")
-                        forward_btn.setFixedSize(30, 30)
-                        forward_btn.clicked.connect(self.browser.forward)
-                        navbar.addWidget(forward_btn)
-                        
-                        reload_btn = QPushButton("↻")
-                        reload_btn.setFixedSize(30, 30)
-                        reload_btn.clicked.connect(self.browser.reload)
-                        navbar.addWidget(reload_btn)
-                        
-                        home_btn = QPushButton("⌂")
-                        home_btn.setFixedSize(30, 30)
-                        home_btn.clicked.connect(self.navigate_home)
-                        navbar.addWidget(home_btn)
-                        
-                        # Адресная строка
-                        self.url_bar = QLineEdit()
-                        self.url_bar.setText(url)
-                        self.url_bar.returnPressed.connect(self.navigate_to_url)
-                        navbar.addWidget(self.url_bar)
-                        
-                        # Кнопка перехода
-                        go_btn = QPushButton("Перейти")
-                        go_btn.setFixedSize(80, 30)
-                        go_btn.clicked.connect(self.navigate_to_url)
-                        navbar.addWidget(go_btn)
-                        
-                        # Обновление URL и заголовка
-                        self.browser.urlChanged.connect(self.update_url_bar)
-                        self.browser.titleChanged.connect(self.update_title)
-                        
-                        self.setCentralWidget(self.browser)
-                        
-                    def navigate_home(self):
-                        self.browser.setUrl(QUrl("https://www.google.com"))
-                        
-                    def navigate_to_url(self):
-                        url = self.url_bar.text().strip()
-                        if not url:
-                            return
-                        if not url.startswith(('http://', 'https://')):
-                            url = 'https://' + url
-                        self.browser.setUrl(QUrl(url))
-                        
-                    def update_url_bar(self, q):
-                        self.url_bar.setText(q.toString())
-                        
-                    def update_title(self, title):
-                        self.setWindowTitle(f"{title} - Flolower Browser")
-                
+                browser = SimpleBrowser()
+                # Запускаем Qt приложение
                 app = QApplication([])
-                browser = RealBrowser(url)
                 browser.show()
                 app.exec_()
             
@@ -1095,11 +2210,6 @@ pip install PyQt5 PyQtWebEngine
             thread = threading.Thread(target=start_qt_browser)
             thread.daemon = True
             thread.start()
-            
-        def show_demo_message(self):
-            """Показывает сообщение в демо-режиме"""
-            message = "Для использования реального браузера установите: pip install PyQt5 PyQtWebEngine"
-            print(message)
     
     # Создаем и возвращаем экземпляр браузера
     browser = BrowserInterface(parent)
@@ -2243,14 +3353,40 @@ def open_app_window(key,title):
         build_calendar(content)
     elif key == "terminal":
         build_terminal(content)
-    elif key == "trash":  # Корзина
+    elif key == "trash":
         build_trash(content)
-    elif key == "files":  # Файловый менеджер
+    elif key == "files":
         build_files(content)
-    elif key == "smile_game":  # Игра "Click on smile!"
+    elif key == "smile_game":
         build_smile_game(content)
+    elif key == "paint":
+        build_paint(content)
+    elif key == "music":
+        build_music(content)
+    elif key == "weather":
+        build_weather(content)
+    elif key == "converter":
+        build_converter(content)
+    elif key == "timer":
+        build_timer(content)
+    elif key == "camera":
+        build_camera(content)
+    elif key == "search":
+        build_search(content)
+    elif key == "text_editor":
+        build_text_editor(content)
+    elif key == "games":
+        build_games(content)
+    elif key == "gallery":
+        build_gallery(content)
+    elif key == "settings":
+        build_settings(content)
+    elif key == "books":
+        build_books(content)
+    elif key == "task_manager":
+        build_task_manager(content)
     else:
-        tk.Label(content, text=f"{title} — демo", bg=WINDOW_BG, fg=TEXT).pack(padx=12, pady=12)
+        tk.Label(content, text=f"{title} — демо", bg=WINDOW_BG, fg=TEXT).pack(padx=12, pady=12)
 
     def start_move(e):
         try:
