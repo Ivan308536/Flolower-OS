@@ -10,16 +10,27 @@ from tkinter import ttk
 import sys
 import threading
 import shutil
-from pathlib import Path
-import math
-import requests
-from io import BytesIO
 import tkinter.filedialog
 import tkinter.messagebox
+from pathlib import Path
+import math
 
-swearing = ["fuck", "bitch","dick","хуй","пизда","говно","пиздец","нахуй","сука","блять","ебать"]
+try:
+    from PyQt5.QtCore import *
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtWebEngineWidgets import *
+    from PyQt5.QtGui import *
+    QT_AVAILABLE = True
+except ImportError:
+    QT_AVAILABLE = False
+    print("Qt WebEngine не установлен. Используется демо-режим браузера.")
+    print("Установите: pip install PyQt5 PyQtWebEngine")
 
-# Попытка импортировать Qt WebEngine
+# Попытка импортировать pyjokes
+try:
+    import pyjokes
+except Exception:
+    pyjokes = None
 try:
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
