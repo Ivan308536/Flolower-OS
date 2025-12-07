@@ -1,3 +1,4 @@
+
 # flolower_os_v10_with_real_browser.py
 # Требуется: pip install PyQt5 PyQtWebEngine
 
@@ -15,6 +16,7 @@ import tkinter.messagebox
 from pathlib import Path
 import math
 
+swearing = ["fuck", "bitch","pidoras", "fucking" , "dick", "хуй", "пизда", "говно", "пиздец", "нахуй", "сука", "блять", "ебать"]
 try:
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
@@ -162,51 +164,9 @@ except Exception as e:
     print("Используется абстрактный фон с кругами")
     use_abstract_background = True
 
-# Создаем абстрактные круги только если не удалось загрузить изображение
-if use_abstract_background:
-    print("Создание абстрактного фона с кругами...")
+
     
-    class AbstractCircle:
-        def __init__(self, x, y, r, color, vx, vy):
-            self.x, self.y, self.r = x, y, r
-            self.color = color
-            self.vx, self.vy = vx, vy
-            self.oid = canvas.create_oval(x-r, y-r, x+r, y+r, fill=color, outline="")
-
-        def step(self):
-            self.x += self.vx
-            self.y += self.vy
-            if self.x - self.r < 0 or self.x + self.r > SW: self.vx *= -1
-            if self.y - self.r < 0 or self.y + self.r > SH: self.vy *= -1
-            canvas.coords(self.oid, self.x-self.r, self.y-self.r, self.x+self.r, self.y+self.r)
-
-        def fade_color(self):
-            try:
-                r = min(255, max(50, int(int(self.color[1:3],16)+random.randint(-4,4))))
-                g = min(255, max(50, int(int(self.color[3:5],16)+random.randint(-4,4))))
-                b = min(255, max(50, int(int(self.color[5:7],16)+random.randint(-4,4))))
-                self.color = f"#{r:02x}{g:02x}{b:02x}"
-                canvas.itemconfig(self.oid, fill=self.color)
-            except Exception:
-                pass
-
-    abstract_circles = []
-    for _ in range(35):
-        r = random.randint(80, 200)
-        x = random.randint(r, SW-r)
-        y = random.randint(r, SH-r)
-        color = random.choice(["#ff4d4d","#4dffff","#ffff4d","#ff4dff","#4dff4d"])
-        vx = random.uniform(-0.15,0.15)
-        vy = random.uniform(-0.1,0.1)
-        abstract_circles.append(AbstractCircle(x,y,r,color,vx,vy))
-
-    def animate_abstract():
-        for c in abstract_circles:
-            c.step(); c.fade_color()
-        root.after(60, animate_abstract)
-
-    animate_abstract()
-    print("Абстрактный фон с кругами создан успешно")
+    
 
 # ------------------ Desktop ------------------
 desktop = tk.Frame(root, bg=BG)
@@ -302,9 +262,6 @@ def shutdown_system():
         tk.Button(btn_frame, text="Отмена", bg=MENU_ITEM, fg=TEXT,
                  font=TEXT_FONT, bd=0, padx=20, pady=8,
                  command=cancel_shutdown).pack(side="right", padx=10)
-        
-        # Закрытие по ESC
-        confirm_win.bind("<Escape>", lambda e: cancel_shutdown())
     
     confirm_shutdown()
 
@@ -3008,7 +2965,13 @@ def build_terminal(parent):
             return
             
         else:
-            write("Command not found!!!")
+            for swear in swearing:
+                if swear in cmd.lower():
+                    write("Please avoid using inappropriate language.")
+                    exit()
+
+                else:
+                    write("Command not found!!!")
 
     entry.bind("<Return>", process_command)
     entry.focus_set()
