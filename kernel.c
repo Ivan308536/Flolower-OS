@@ -129,8 +129,25 @@ void execute_command() {
 }
 
 void kernel_main(void) {
-	terminal_clear();
-    terminal_write("=========================================\n");
-	terminal_write("         Welcome to Flolower-OS          \n");
-    terminal_write("=========================================\n");
-    terminal_write("Type 'help' for menu commands.\n\n");
+    terminal_clear();
+    terminal_write("Welcome to Flolower OS!\n");
+	terminal_write("Type 'help' for menu commands\n");
+    terminal_write("Flolower> ");
+
+    while(1) {
+        if (inb(0x64) & 1) {
+            uint8_t scancode = inb(0x60);
+            if (!(scancode & 0x80)) {
+                char c = scancode_to_ascii(scancode);
+                if (c == '\n') {
+                    input_buffer[input_index] = '\0';
+                    execute_command();
+                    terminal_write("> ");
+                } else if (c > 0) {
+                    terminal_putchar(c);
+                    if (input_index < 255) input_buffer[input_index++] = c;
+                }
+            }
+        }
+    }
+}
