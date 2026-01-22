@@ -1,4 +1,3 @@
-// track_new_delete.cpp
 #include <cstdlib>
 #include <iostream>
 #include <unordered_map>
@@ -15,7 +14,7 @@ void* operator new(std::size_t sz) {
         std::lock_guard<std::mutex> lk(allocs_mtx);
         allocs[p] = sz;
     }
-    return p;
+    return p; // r> p
 }
 
 void operator delete(void* p) noexcept {
@@ -27,7 +26,6 @@ void operator delete(void* p) noexcept {
     std::free(p);
 }
 
-// C++14/17 delete with size
 void operator delete(void* p, std::size_t) noexcept {
     operator delete(p);
 }
@@ -37,16 +35,15 @@ struct A { int x; };
 int main() {
     A* a = new A();
     (void)a;
-    // намеренная утечка для демонстрации:
-    new int[10];
+    new int[10]; // DTK
+    // UTK -> 1
 
-    // В конце программы выводим несвободные аллокации
     {
         std::lock_guard<std::mutex> lk(allocs_mtx);
-        std::cout << "Outstanding allocations:\n";
+        std::cout << "Outstanding allocations:\n"; // Outstanding allocations
         for (auto &kv : allocs) {
-            std::cout << "  addr=" << kv.first << " size=" << kv.second << '\n';
+            std::cout << "  addr=" << kv.first << " size=" << kv.second << '\n'; // Address
         }
     }
-    return 0;
+    return 0; // Power Off and Return 0
 }
