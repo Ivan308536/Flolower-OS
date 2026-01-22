@@ -1,7 +1,3 @@
-
-# flolower_os_v10_with_real_browser.py
-# Требуется: pip install PyQt5 PyQtWebEngine
-
 import tkinter as tk
 import random, time, json, os, calendar, datetime
 import subprocess
@@ -16,7 +12,6 @@ import tkinter.messagebox
 from pathlib import Path
 import math
 
-swearing = ["fuck", "bitch","pidoras", "fucking" , "dick", "хуй", "пизда", "говно", "пиздец", "нахуй", "сука", "блять", "ебать"]
 try:
     from PyQt5.QtCore import *
     from PyQt5.QtWidgets import *
@@ -25,10 +20,7 @@ try:
     QT_AVAILABLE = True
 except ImportError:
     QT_AVAILABLE = False
-    print("Qt WebEngine не установлен. Используется демо-режим браузера.")
-    print("Установите: pip install PyQt5 PyQtWebEngine")
 
-# Попытка импортировать pyjokes
 try:
     import pyjokes
 except Exception:
@@ -41,16 +33,12 @@ try:
     QT_AVAILABLE = True
 except ImportError:
     QT_AVAILABLE = False
-    print("Qt WebEngine не установлен. Используется демо-режим браузера.")
-    print("Установите: pip install PyQt5 PyQtWebEngine")
 
-# Попытка импортировать pyjokes
 try:
     import pyjokes
 except Exception:
     pyjokes = None
 
-# ------------------ Config ------------------
 BG = "#0f0b18"
 MENU_BG = "#231a30"
 MENU_ITEM = "#2b2036"
@@ -102,9 +90,8 @@ ICON_POS_FILE = "icons_pos_v10.json"
 NOTES_SAVE_PATH = r"D:\замітки.txt"
 PINNED_APPS_FILE = "pinned_apps_v10.json"
 WALLPAPER_PATH = "Flolower fone.jpg"
-TRASH_DIR = "FlolowerTrash"  # Папка для корзины
+TRASH_DIR = "Trash"
 
-# ------------------ Load saved icon positions ------------------
 try:
     if os.path.exists(ICON_POS_FILE):
         with open(ICON_POS_FILE, "r", encoding="utf-8") as f:
@@ -114,7 +101,6 @@ try:
 except Exception:
     saved_positions = {}
 
-# ------------------ Load pinned apps ------------------
 try:
     if os.path.exists(PINNED_APPS_FILE):
         with open(PINNED_APPS_FILE, "r", encoding="utf-8") as f:
@@ -124,60 +110,40 @@ try:
 except Exception:
     pinned_apps = []
 
-# ------------------ Root ------------------
 root = tk.Tk()
 root.title("Flolower OS v1.0(beta)")
 root.attributes("-fullscreen", True)
 root.configure(bg=BG)
 SW, SH = root.winfo_screenwidth(), root.winfo_screenheight()
 
-# ------------------ Canvas with wallpaper ------------------
 canvas = tk.Canvas(root, bg=BG, highlightthickness=0)
 canvas.place(relwidth=1, relheight=1)
 
-# Флаг для отслеживания, какое изображение используется
 use_abstract_background = True
-
-print(f"Попытка загрузить фоновое изображение: {WALLPAPER_PATH}")
-print(f"Файл существует: {os.path.exists(WALLPAPER_PATH)}")
-print(f"Текущая директория: {os.getcwd()}")
 
 try:
     if os.path.exists(WALLPAPER_PATH):
         wallpaper_img = Image.open(WALLPAPER_PATH)
-        # Масштабируем изображение под размер экрана
         wallpaper_img = wallpaper_img.resize((SW, SH), Image.Resampling.LANCZOS)
         wallpaper_photo = ImageTk.PhotoImage(wallpaper_img)
         
-        # Создаем фоновое изображение на canvas
         canvas.create_image(0, 0, anchor="nw", image=wallpaper_photo)
-        canvas.image = wallpaper_photo  # Сохраняем ссылку на изображение
+        canvas.image = wallpaper_photo
         
-        print(f"Фоновое изображение '{WALLPAPER_PATH}' успешно загружено")
         use_abstract_background = False
     else:
-        print(f"Файл '{WALLPAPER_PATH}' не найден")
         use_abstract_background = True
     
 except Exception as e:
-    print(f"Ошибка загрузки фонового изображения: {e}")
-    print("Используется абстрактный фон с кругами")
     use_abstract_background = True
 
-
-    
-    
-
-# ------------------ Desktop ------------------
 desktop = tk.Frame(root, bg=BG)
 desktop.place(relwidth=1, relheight=1)
 
-# ------------------ Taskbar ------------------
 TASK_H = 56
 taskbar = tk.Frame(root, bg=TASKBAR_BG, height=TASK_H)
 taskbar.pack(side="bottom", fill="x")
 
-# Загрузка и отображение изображения вместо кнопки "Пуск"
 try:
     start_img = Image.open("Frame 14.png")
     start_img = start_img.resize((40, 40), Image.Resampling.LANCZOS)
@@ -188,19 +154,15 @@ try:
     start_btn.pack(side="left", padx=12, pady=8)
     
 except Exception as e:
-    print(f"Ошибка загрузки изображения: {e}")
     start_btn = tk.Button(taskbar, text="⊞ Пуск", bg=MENU_BG, fg=TEXT, font=TEXT_FONT, bd=0, padx=12, pady=6)
     start_btn.pack(side="left", padx=12, pady=6)
 
-# Фрейм для закрепленных приложений
 pinned_frame = tk.Frame(taskbar, bg=TASKBAR_BG)
 pinned_frame.pack(side="left", padx=8, pady=6)
 
-# Фрейм для открытых окон
 task_buttons_frame = tk.Frame(taskbar, bg=TASKBAR_BG)
 task_buttons_frame.pack(side="left", padx=8, pady=6)
 
-# Кнопка выключения
 shutdown_btn = tk.Button(taskbar, text="⏻", bg=TASKBAR_BG, fg="#ff4444", 
                         font=("Segoe UI Emoji", 20), bd=0, padx=12, pady=4,
                         command=lambda: shutdown_system())
@@ -212,80 +174,49 @@ def tick_time(): time_lbl.config(text=time.strftime("%H:%M")); root.after(1000,t
 tick_time()
 task_buttons={}
 
-# ------------------ Shutdown function ------------------
 def shutdown_system():
-    """Функция выключения системы"""
     def confirm_shutdown():
-        # Создаем окно подтверждения
         confirm_win = tk.Toplevel(root)
         confirm_win.overrideredirect(True)
         confirm_win.configure(bg=WINDOW_BG)
         confirm_win.attributes("-topmost", True)
         
-        # Центрируем окно
         win_w, win_h = 400, 200
         x = (SW - win_w) // 2
         y = (SH - win_h) // 2
         confirm_win.geometry(f"{win_w}x{win_h}+{x}+{y}")
         
-        # Заголовок
         title_bar = tk.Frame(confirm_win, bg=TITLE_BG, height=36)
         title_bar.pack(fill="x")
-        tk.Label(title_bar, text="Выключение системы", bg=TITLE_BG, fg=TEXT, font=TITLE_FONT).pack(side="left", padx=8)
+        tk.Label(title_bar, text="Power Off", bg=TITLE_BG, fg=TEXT, font=TITLE_FONT).pack(side="left", padx=8)
         
-        # Контент
         content = tk.Frame(confirm_win, bg=WINDOW_BG)
         content.pack(expand=True, fill="both", padx=20, pady=20)
         
-        # Сообщение
-        msg = tk.Label(content, text="Вы уверены, что хотите выключить систему?", 
+        msg = tk.Label(content, text="Power Off system?", 
                       bg=WINDOW_BG, fg=TEXT, font=TEXT_FONT)
         msg.pack(pady=10)
         
-        # Кнопки
         btn_frame = tk.Frame(content, bg=WINDOW_BG)
         btn_frame.pack(side="bottom", pady=20)
         
         def do_shutdown():
-            # Анимация выключения
             shutdown_animation()
-            # Закрываем все окна и выходим
             root.after(2000, lambda: (save_icon_positions(), root.destroy()))
         
         def cancel_shutdown():
             confirm_win.destroy()
         
-        tk.Button(btn_frame, text="Выключить", bg="#ff4444", fg="white", 
+        tk.Button(btn_frame, text="Power Off", bg="#ff4444", fg="white", 
                  font=TEXT_FONT, bd=0, padx=20, pady=8,
                  command=do_shutdown).pack(side="left", padx=10)
         
-        tk.Button(btn_frame, text="Отмена", bg=MENU_ITEM, fg=TEXT,
+        tk.Button(btn_frame, text="Cancel", bg=MENU_ITEM, fg=TEXT,
                  font=TEXT_FONT, bd=0, padx=20, pady=8,
                  command=cancel_shutdown).pack(side="right", padx=10)
     
     confirm_shutdown()
 
-def shutdown_animation():
-    """Анимация выключения системы"""
-    # Создаем полноэкранное затемнение
-    overlay = tk.Canvas(root, bg="black", highlightthickness=0)
-    overlay.place(relwidth=1, relheight=1)
-    
-    # Добавляем сообщение
-    message = overlay.create_text(SW//2, SH//2, text="Система выключается...", 
-                                 fill="white", font=("Segoe UI", 24), anchor="center")
-    
-    # Анимация затемнения
-    def fade_out(alpha=0):
-        if alpha < 1.0:
-            overlay.config(bg=f"#000000")
-            root.after(50, lambda: fade_out(alpha + 0.05))
-        else:
-            overlay.config(bg="black")
-    
-    fade_out()
-
-# ------------------ Pinned apps on taskbar ------------------
 pinned_buttons = {}
 
 def save_pinned_apps():
@@ -333,14 +264,12 @@ def unpin_app(key):
             pinned_buttons[key].destroy()
             del pinned_buttons[key]
 
-# Инициализация закрепленных приложений при запуске
 for app_key in pinned_apps:
     for emoji, title, key in APP_LIST:
         if key == app_key:
             create_pinned_button(emoji, title, key)
             break
 
-# ------------------ Start menu ------------------
 MENU_W = min(560,int(SW*0.52))
 MENU_H = min(560,int(SH*0.62))
 MENU_X = (SW-MENU_W)//2
@@ -354,11 +283,9 @@ search_var = tk.StringVar()
 search_entry = tk.Entry(start_menu,textvariable=search_var,bg="#2b2334",fg=TEXT,bd=0,font=TEXT_FONT,insertbackground=TEXT)
 search_entry.place(x=16,y=16,width=MENU_W-32,height=36)
 
-# Увеличиваем высоту apps_frame чтобы вместить все приложения
 apps_frame = tk.Frame(start_menu,bg=MENU_BG)
 apps_frame.place(x=16,y=72,width=MENU_W-32,height=MENU_H-88)
 
-# Создаем Canvas и Scrollbar для прокрутки
 apps_canvas = tk.Canvas(apps_frame, bg=MENU_BG, highlightthickness=0)
 scrollbar = tk.Scrollbar(apps_frame, orient="vertical", command=apps_canvas.yview)
 scrollable_frame = tk.Frame(apps_canvas, bg=MENU_BG)
@@ -374,7 +301,6 @@ apps_canvas.configure(yscrollcommand=scrollbar.set)
 apps_canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-# Привязываем колесико мыши к прокрутке
 def on_mousewheel(event):
     apps_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
@@ -386,7 +312,6 @@ def on_start_app(app_key, app_title):
     toggle_menu(False)
     open_app_window(app_key, app_title)
 
-# Создаем приложения в scrollable_frame вместо apps_frame
 for emoji,title,key in APP_LIST:
     row=tk.Frame(scrollable_frame,bg=MENU_ITEM,height=44)
     row.pack(fill="x", pady=6)
@@ -413,13 +338,11 @@ def toggle_pin(key, title, emoji):
         unpin_app(key)
     else:
         pin_app(key, title, emoji)
-    # Обновляем все кнопки закрепления
     for widget in scrollable_frame.winfo_children():
         for child in widget.winfo_children():
             if isinstance(child, tk.Frame):
                 for grandchild in child.winfo_children():
                     if isinstance(grandchild, tk.Button) and grandchild['text'] in ("📌", "📍"):
-                        # Находим соответствующий ключ приложения
                         for app_emoji, app_title, app_key in APP_LIST:
                             if app_key == key:
                                 if key in pinned_apps:
@@ -436,7 +359,6 @@ def refresh_app_list(*_):
         else:
             w.pack_forget()
             
-    # Обновляем scrollregion после фильтрации
     apps_canvas.configure(scrollregion=apps_canvas.bbox("all"))
 
 search_var.trace_add("write", refresh_app_list)
@@ -470,7 +392,6 @@ root.bind("<Button-1>", lambda e: hide_menu() if menu_visible and not start_menu
 root.bind("<Key>", lambda e: toggle_menu() if e.keysym in ("Super_L","Super_R") else None)
 root.bind("<Escape>", lambda e: hide_menu())
 
-# ------------------ Window system ------------------
 open_windows=[]
 pinned_windows = {}
 
@@ -532,14 +453,11 @@ def close_window(win, btn):
     except:
         pass
 
-# ------------------ Trash System ------------------
 def ensure_trash_dir():
-    """Создает папку для корзины если её нет"""
     if not os.path.exists(TRASH_DIR):
         os.makedirs(TRASH_DIR, exist_ok=True)
 
 def get_trash_contents():
-    """Возвращает содержимое корзины"""
     ensure_trash_dir()
     contents = []
     try:
@@ -558,7 +476,6 @@ def get_trash_contents():
     return contents
 
 def move_to_trash(file_path):
-    """Перемещает файл/папку в корзину"""
     try:
         ensure_trash_dir()
         if not os.path.exists(file_path):
@@ -567,7 +484,6 @@ def move_to_trash(file_path):
         file_name = os.path.basename(file_path)
         trash_path = os.path.join(TRASH_DIR, file_name)
         
-        # Если файл с таким именем уже есть в корзине, добавляем суффикс
         counter = 1
         original_trash_path = trash_path
         while os.path.exists(trash_path):
@@ -576,12 +492,11 @@ def move_to_trash(file_path):
             counter += 1
         
         shutil.move(file_path, trash_path)
-        return True, "Успешно перемещено в корзину"
+        return True,
     except Exception as e:
         return False, f"Ошибка: {str(e)}"
 
 def restore_from_trash(trash_item_name, restore_path=None):
-    """Восстанавливает файл из корзины"""
     try:
         trash_path = os.path.join(TRASH_DIR, trash_item_name)
         if not os.path.exists(trash_path):
@@ -590,7 +505,6 @@ def restore_from_trash(trash_item_name, restore_path=None):
         if restore_path is None:
             restore_path = os.path.join(os.getcwd(), trash_item_name)
         
-        # Если файл уже существует в месте восстановления
         counter = 1
         original_restore_path = restore_path
         while os.path.exists(restore_path):
@@ -604,7 +518,6 @@ def restore_from_trash(trash_item_name, restore_path=None):
         return False, f"Ошибка восстановления: {str(e)}"
 
 def empty_trash():
-    """Очищает корзину полностью"""
     try:
         ensure_trash_dir()
         for item in os.listdir(TRASH_DIR):
@@ -618,7 +531,6 @@ def empty_trash():
         return False, f"Ошибка очистки: {str(e)}"
 
 def delete_permanently(trash_item_name):
-    """Удаляет файл из корзины навсегда"""
     try:
         trash_path = os.path.join(TRASH_DIR, trash_item_name)
         if os.path.isdir(trash_path):
@@ -629,7 +541,6 @@ def delete_permanently(trash_item_name):
     except Exception as e:
         return False, f"Ошибка удаления: {str(e)}"
 
-# ------------------ Game Class ------------------
 class SmileGame:
     def __init__(self, parent):
         self.parent = parent
@@ -639,93 +550,74 @@ class SmileGame:
         self.jump_offset = 0
         self.game_active = True
         
-        # Константы игры
         self.WIDTH, self.HEIGHT = 600, 500
         self.BLOCK_SIZE = 120
         self.JUMP_DURATION = 0.3
         self.JUMP_HEIGHT = 25
         
-        # Создаем фрейм для игры
         self.frame = tk.Frame(parent, bg=WINDOW_BG)
         self.frame.pack(expand=True, fill="both", padx=12, pady=12)
         
-        # Канва для игры
         self.canvas = tk.Canvas(self.frame, width=self.WIDTH, height=self.HEIGHT, 
                                bg=WINDOW_BG, highlightthickness=0)
         self.canvas.pack(pady=20)
         
-        # Заголовок
         title_label = tk.Label(self.frame, text="🎮 Click on smile!", 
                               bg=WINDOW_BG, fg=TEXT, font=("Segoe UI", 16, "bold"))
         title_label.pack(pady=10)
         
-        # Создаем смайл (используем эмодзи если нет изображения)
         try:
-            # Пробуем загрузить изображение смайла
             if os.path.exists("smile.png"):
                 img = Image.open("smile.png").resize((self.BLOCK_SIZE, self.BLOCK_SIZE))
                 self.smile_image = ImageTk.PhotoImage(img)
                 self.smile = self.canvas.create_image(self.WIDTH//2, self.HEIGHT//2, 
                                                     image=self.smile_image)
             else:
-                # Создаем смайл с помощью эмодзи
                 self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
                                                    text="😊", font=("Segoe UI Emoji", 80))
         except Exception as e:
             print(f"Ошибка загрузки изображения смайла: {e}")
-            # Создаем смайл с помощью эмодзи
             self.smile = self.canvas.create_text(self.WIDTH//2, self.HEIGHT//2, 
                                                text="😊", font=("Segoe UI Emoji", 80))
         
-        # Текст очков
         self.score_text = self.canvas.create_text(self.WIDTH//2, 40, 
                                                 text="Очки: 0", 
                                                 font=("Segoe UI", 24), 
                                                 fill=TEXT)
         
-        # Инструкция
         instruction = self.canvas.create_text(self.WIDTH//2, self.HEIGHT - 30, 
                                             text="Кликай на смайл чтобы зарабатывать очки!", 
                                             font=("Segoe UI", 12), 
                                             fill=TEXT)
         
-        # Кнопка сброса
         reset_btn = tk.Button(self.frame, text="🔄 Начать заново", 
                              bg=MENU_ITEM, fg=TEXT, font=TEXT_FONT,
                              command=self.reset_game)
         reset_btn.pack(pady=10)
         
-        # Обработка кликов
         self.canvas.bind("<Button-1>", self.click)
         
-        # Запуск обновления игры
         self.update()
 
     def click(self, event):
         if not self.game_active:
             return
             
-        # Координаты смайла
         x1 = self.WIDTH//2 - self.BLOCK_SIZE//2
         y1 = self.HEIGHT//2 - self.BLOCK_SIZE//2 - self.jump_offset
         x2 = x1 + self.BLOCK_SIZE
         y2 = y1 + self.BLOCK_SIZE
 
-        # Проверка попадания по смайлу
         if x1 <= event.x <= x2 and y1 <= event.y <= y2:
             self.points += 1
             self.jumping = True
             self.jump_start_time = time.time()
-            
-            # Меняем цвет смайла при клике
-            self.canvas.itemconfig(self.score_text, fill="#4dff4d")  # Зеленый цвет
+            self.canvas.itemconfig(self.score_text, fill="#4dff4d")
 
     def update(self):
-        # Анимация прыжка
         if self.jumping:
             elapsed = time.time() - self.jump_start_time
             if elapsed < self.JUMP_DURATION:
-                # Параболическая траектория прыжка
                 progress = elapsed / self.JUMP_DURATION
                 self.jump_offset = self.JUMP_HEIGHT * (1 - (2 * progress - 1) ** 2)
             else:
@@ -2478,7 +2370,7 @@ def build_terminal(parent):
             write("Trash commands: trash, trash_empty, trash_restore, trash_delete")
             return
 
-        if cmd == swearing:
+        if cmd == :
             pass
 
         if cmd == "ls":
@@ -2963,12 +2855,6 @@ def build_terminal(parent):
             write("A custom operating system interface built with Python and Tkinter")
             write("Terminal with enhanced command set")
             return
-            
-        else:
-            for swear in swearing:
-                if swear in cmd.lower():
-                    write("Please avoid using inappropriate language.")
-                    exit()
 
                 else:
                     write("Command not found!!!")
