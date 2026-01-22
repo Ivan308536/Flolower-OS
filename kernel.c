@@ -1,6 +1,5 @@
 #include <stdint.h>
 
-// Multiboot заголовок
 #define MULTIBOOT_HEADER_MAGIC 0x1BADB002
 #define MULTIBOOT_HEADER_FLAGS 0x00000003
 #define CHECKSUM -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
@@ -12,16 +11,14 @@ const uint32_t multiboot_header[] = {
     CHECKSUM
 };
 
-// Структура исполняемого файла
 struct ExecHeader {
-    uint32_t magic;          // 0xDEADBEEF
-    uint32_t entry_point;    // Точка входа
-    uint32_t code_size;      // Размер кода
-    uint32_t data_size;      // Размер данных
-    uint32_t stack_size;     // Размер стека
+    uint32_t magic;
+    uint32_t entry_point;
+    uint32_t code_size;
+    uint32_t data_size;
+    uint32_t stack_size;
 };
 
-// Константы
 #define EXEC_MAGIC 0xDEADBEEF
 #define EXEC_MEMORY_BASE 0x100000
 #define USER_STACK_BASE  0x800000
@@ -39,7 +36,7 @@ const int VGA_HEIGHT = 25;
 int cursor_x = 0;
 int cursor_y = 0;
 
-// Функции VGA
+// VGA Fun
 void clear_screen() {
     for (int y = 0; y < VGA_HEIGHT; y++) {
         for (int x = 0; x < VGA_WIDTH; x++) {
@@ -64,7 +61,6 @@ void print_char(char c, uint8_t color = 0x0F) {
     }
     if (cursor_y >= VGA_HEIGHT) {
         cursor_y = VGA_HEIGHT - 1;
-        // Простой скролл
         for (int y = 0; y < VGA_HEIGHT - 1; y++) {
             for (int x = 0; x < VGA_WIDTH; x++) {
                 video_memory[y * VGA_WIDTH + x] = video_memory[(y + 1) * VGA_WIDTH + x];
@@ -92,7 +88,7 @@ void print_hex(uint32_t n, uint8_t color = 0x0F) {
     print_string(buf, color);
 }
 
-// === ВАША ФАЙЛОВАЯ СИСТЕМА ===
+// FS
 
 struct File {
     const char* name;
@@ -101,39 +97,19 @@ struct File {
     bool is_executable;
 };
 
-// Пример исполняемого файла (простая программа)
 const uint8_t test_exe_data[] = {
-    // Заголовок ExecHeader
-    0xEF, 0xBE, 0xAD, 0xDE, // magic = 0xDEADBEEF
-    0x00, 0x00, 0x20, 0x00, // entry_point = 0x200000
-    0x30, 0x00, 0x00, 0x00, // code_size = 48 bytes
-    0x00, 0x00, 0x00, 0x00, // data_size = 0
-    0x00, 0x10, 0x00, 0x00, // stack_size = 4096
+    0xEF, 0xBE, 0xAD, 0xDE,
+    0x00, 0x00, 0x20, 0x00,
+    0x30, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x10, 0x00, 0x00,
     
-    // Код программы (просто возвращает управление)
-    0x60,                   // pusha
+    0x60,
     0xB8, 0x48, 0x65, 0x6C, 0x6C, 0x6F, // mov eax, 'Hello'
     0xBB, 0x00, 0x80, 0x0B, 0x00,       // mov ebx, 0xB8000
     0x89, 0x03,                         // mov [ebx], eax
     0x61,                               // popa
     0xC3                                // ret
-};
-
-// Данные для системных файлов (заглушки)
-const uint8_t core_py_data[] = { 
-    '#', ' ', 'C', 'o', 'r', 'e', ' ', 'P', 'y', 't', 'h', 'o', 'n', ' ', 's', 'y', 's', 't', 'e', 'm', '\n' 
-};
-
-const uint8_t kernel_py_data[] = { 
-    '#', ' ', 'K', 'e', 'r', 'n', 'e', 'l', ' ', 'i', 'n', ' ', 'P', 'y', 't', 'h', 'o', 'n', '\n' 
-};
-
-const uint8_t boot_asm_data[] = { 
-    ';', ' ', 'B', 'o', 'o', 't', 'l', 'o', 'a', 'd', 'e', 'r', ' ', 'c', 'o', 'd', 'e', '\n' 
-};
-
-const uint8_t readme_data[] = { 
-    'P', 'y', 'O', 'S', ' ', '-', ' ', 'S', 'i', 'm', 'p', 'l', 'e', ' ', 'O', 'S', ' ', 'w', 'i', 't', 'h', ' ', 'P', 'y', 't', 'h', 'o', 'n', '\n' 
 };
 
 class VirtualFileSystem {
@@ -143,7 +119,6 @@ private:
 
 public:
     VirtualFileSystem() : file_count(0) {
-        // Инициализируем файловую систему
         add_file("/system/", nullptr, 0, false);
         add_file("/temp/", nullptr, 0, false);
         add_file("/system/core.py", core_py_data, sizeof(core_py_data), false);
@@ -165,7 +140,6 @@ public:
 
     File* find_file(const char* filename) {
         for (int i = 0; i < file_count; i++) {
-            // Простое сравнение строк (в реальной ОС нужно полное сравнение путей)
             const char* fname = files[i].name;
             const char* search = filename;
             
@@ -203,7 +177,6 @@ public:
             
             if (files[i].data != nullptr) {
                 print_string(" (", 0x08);
-                // Простой вывод размера
                 char size_buf[16];
                 const char* digits = "0123456789";
                 uint32_t size = files[i].size;
@@ -214,7 +187,6 @@ public:
                     size /= 10;
                 } while (size > 0 && pos < 15);
                 
-                // Реверсируем строку
                 for (int j = 0; j < pos / 2; j++) {
                     char temp = size_buf[j];
                     size_buf[j] = size_buf[pos - 1 - j];
@@ -253,8 +225,6 @@ public:
     }
 };
 
-// === ЗАГРУЗЧИК EXE ФАЙЛОВ ===
-
 class ExecutableLoader {
 private:
     VirtualFileSystem& fs;
@@ -264,7 +234,7 @@ private:
             print_string("Error: Invalid EXE magic\n", 0x04);
             return false;
         }
-        if (header->code_size > 1024 * 1024) { // 1MB max
+        if (header->code_size > 1024 * 1024) { // 1 MB
             print_string("Error: Code too large\n", 0x04);
             return false;
         }
@@ -290,7 +260,6 @@ public:
             return -1;
         }
         
-        // Читаем заголовок
         ExecHeader header;
         if (fs.read_file(filename, &header, sizeof(header)) != sizeof(header)) {
             print_string("Error: Cannot read EXE header\n", 0x04);
@@ -307,7 +276,6 @@ public:
         print_hex(header.code_size, 0x0A);
         print_string(" bytes\n", 0x0F);
         
-        // Загружаем код в память
         uint8_t* code_dest = (uint8_t*)header.entry_point;
         int bytes_read = fs.read_file(filename, code_dest, header.code_size);
         
@@ -333,7 +301,6 @@ public:
             return;
         }
         
-        // Получаем точку входа
         ExecHeader header;
         fs.read_file(filename, &header, sizeof(header));
         
@@ -343,7 +310,6 @@ public:
         
         uint32_t user_stack = USER_STACK_BASE;
         
-        // Переход в пользовательский код
         asm volatile(
             "mov %0, %%esp\n\t"
             "mov %0, %%ebp\n\t"
@@ -360,8 +326,6 @@ public:
         print_string("Executable files:\n", 0x0E);
         bool found = false;
         
-        // В реальной ОС нужно сканировать файловую систему
-        // Здесь просто проверяем известные EXE файлы
         const char* exe_files[] = {"/test.exe", nullptr};
         
         for (int i = 0; exe_files[i] != nullptr; i++) {
@@ -379,7 +343,6 @@ public:
     }
 };
 
-// Глобальные объекты
 VirtualFileSystem vfs;
 ExecutableLoader exec_loader(vfs);
 
@@ -402,28 +365,19 @@ extern "C" void _start() {
 extern "C" void kmain() {
     clear_screen();
     
-    print_string("=== PyOS Kernel ===\n\n", 0x0F);
+    print_string("=== Kernel ===\n\n", 0x0F);
     
     print_string("Virtual File System Ready!\n\n", 0x0E);
     
-    // Показываем содержимое файловой системы
     vfs.list_files();
     
     print_string("\n", 0x0F);
     
-    // Демонстрируем работу с EXE файлами
     exec_loader.list_executables();
     
     print_string("\n", 0x0F);
     
-    // Запускаем тестовую программу
-    if (vfs.file_exists("/test.exe")) {
-        print_string("Running test program:\n", 0x0E);
-        exec_loader.execute("/test.exe");
-    }
-    
     print_string("\nKernel execution complete\n", 0x0F);
-    print_string("Type 'exec_loader.execute(\"/test.exe\")' to run again\n", 0x08);
     
     while (1) asm volatile("hlt");
 }
