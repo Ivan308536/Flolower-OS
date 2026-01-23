@@ -1,0 +1,35 @@
+# Flolower-OS: Руководство по запуска в QEMU
+
+## Описание проекта
+
+Flolower OS - это операционная система, разработанная для архитектуры x86-x64 (x64). Система функционирует в 64-битном защищенном режиме и предоставляет пользователю текстовый интерфейс (шелл).
+
+Это значит что для QEMU требуеться x86_x64:
+
+```bash
+qemu-system-x86_64 -m <Скольк требуеться RAM взять в GB> -cdrom <Путь к iso> -hda virtual_disk.qcow2 -boot d
+```
+
+Но перед запуском нам требуеться создать виртуальный диск `virtual_disk.qcow2`:
+
+```bash
+qemu-img create -f qcow2 virtual_disk.qcow2 <Максимальный размер виртуального диска>
+```
+
+# Запуск Flolower OS
+
+## 1
+
+```bash
+qemu-img create -f qcow2 virtual_disk.qcow2 20G
+```
+
+## 2
+
+```bash
+qemu-system-x86_64 -m 2G -cdrom flolower-os.iso -hda virtual_disk.qcow2 -boot d
+```
+
+# Info
+
+Можно имя виртуального диска вставлять и не virtual_disk, но у Flolower OS есть сохранение на диск самой ОС есть как com.history с историей 256 комманд

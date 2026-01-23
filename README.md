@@ -44,7 +44,7 @@ qemu-system-x86_x64 -cdrom flolower-os.iso
 make clean
 ```
 
-## Возможные ошибки и их устранение
+## Возможные ошибки и их устранение+
 
 ### Ошибка: `grub-mkrescue: command not found`
 
