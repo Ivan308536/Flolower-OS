@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "ata.h"
+#include "panic.h"
 
 size_t strlen(const char* str);
 void strcpy(char* dest, const char* src);
@@ -208,49 +209,43 @@ bool check_vga() {
     return true;
 }
 
-void bootscreen_animate_check(int y, const char* component, bool* status) {
+void bootscreen_animate_check(int y, const char* component, bool status, const char* error_msg, const char* fix) {
     const char* frames[] = {" ---  ", " #--  ", " -#-  ", " --#  "};
     uint8_t color_white = vga_entry_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     uint8_t color_green = vga_entry_color(VGA_COLOR_GREEN, VGA_COLOR_BLACK);
     uint8_t color_red = vga_entry_color(VGA_COLOR_RED, VGA_COLOR_BLACK);
     
+    int total_width = 30; 
+    int start_x = (VGA_WIDTH - total_width) / 2;
+
     for(int frame = 0; frame < 4; frame++) {
         char buffer[64];
-        strcpy(buffer, component);
-        int len = strlen(buffer);
-        buffer[len] = ' ';
-        buffer[len+1] = '[';
-        for(int i = 0; frames[frame][i]; i++) {
-            buffer[len+2+i] = frames[frame][i];
-        }
-        buffer[len+8] = ']';
-        buffer[len+9] = '\0';
+        memset(buffer, ' ', 64);
         
-        int start_x = (VGA_WIDTH - strlen(buffer)) / 2;
+        for(int i = 0; component[i]; i++) buffer[i] = component[i];
+        
+        buffer[18] = '[';
+        for(int i = 0; frames[frame][i]; i++) buffer[19+i] = frames[frame][i];
+        buffer[25] = ']';
+        buffer[26] = '\0';
+        
         for(int i = 0; i < (int)strlen(buffer); i++) {
             terminal_putentryat(buffer[i], color_white, start_x + i, y);
         }
         delay(150);
     }
     
-    char result[64];
-    strcpy(result, component);
-    int len = strlen(result);
-    int start_x = (VGA_WIDTH - (len + 10)) / 2;
-
-    if(*status) {
-        result[len] = ' '; result[len+1] = '['; result[len+2] = ' '; result[len+3] = 'O';
-        result[len+4] = 'K'; result[len+5] = ' '; result[len+6] = ']'; result[len+7] = '\0';
-        for(int i = 0; i < (int)strlen(result); i++) terminal_putentryat(result[i], color_green, start_x + i, y);
+    for(int i = 0; component[i]; i++) terminal_putentryat(component[i], color_white, start_x + i, y);
+    
+    if(status) {
+        const char* ok_msg = "[  OK  ]";
+        for(int i = 0; ok_msg[i]; i++) terminal_putentryat(ok_msg[i], color_green, start_x + 18 + i, y);
     } else {
-        result[len] = ' '; result[len+1] = '['; result[len+2] = 'F'; result[len+3] = 'A';
-        result[len+4] = 'I'; result[len+5] = 'L'; result[len+6] = ']'; result[len+7] = '\0';
-        for(int i = 0; i < (int)strlen(result); i++) terminal_putentryat(result[i], color_red, start_x + i, y);
-        terminal_row = y + 2;
-        terminal_column = 0;
-        terminal_write("BOOT FAILED - System Halted at: ");
-        terminal_write(component);
-        while(1) asm volatile("hlt");
+        const char* fail_msg = "[ FAIL ]";
+        for(int i = 0; fail_msg[i]; i++) terminal_putentryat(fail_msg[i], color_red, start_x + 18 + i, y);
+        delay(500);
+        
+        kernel_panic(component, error_msg, fix);
     }
 }
 
@@ -279,22 +274,30 @@ void show_boot_sequence() {
     int center_y = 12;
     
     bool cpu_ok = check_cpu();
-    bootscreen_animate_check(center_y, "CPUID ", &cpu_ok);
+    bootscreen_animate_check(center_y, "CPUID", cpu_ok, 
+        "Processor does not support x86_64 or long mode", 
+        "Upgrade your processor to a newer x86-x64 (long mode)");
     delay(200);
 
     bool vga_ok = check_vga();
-    bootscreen_animate_check(center_y + 1, "VGA Buffer   ", &vga_ok);
+    bootscreen_animate_check(center_y + 1, "VGA Buffer", vga_ok, 
+        "Cannot write to video memory at 0xB8000", 
+        "Ensure VGA device is initialized in BIOS/UEFI");
     delay(200);
 
     bool ata_ok = check_ata();
-    bootscreen_animate_check(center_y + 2, "ATA Primary  ", &ata_ok);
+    bootscreen_animate_check(center_y + 2, "ATA Primary", ata_ok, 
+        "No IDE drive found or controller not responding", 
+        "Check your disk to see if it is full or if there are any problems with it.");
     delay(200);
 
-    extern uint64_t stack_top; // из b.s
+    extern uint64_t stack_top;
     bool mem_ok = (&stack_top != NULL);
-    bootscreen_animate_check(center_y + 3, "Memory Stack ", &mem_ok);
+    bootscreen_animate_check(center_y + 3, "Memory Stack", mem_ok, 
+        "Kernel stack pointer is invalid (NULL)", 
+        "Verify bootloader memory map and b.s alignment");
 
-    delay(1000);
+    delay(500);
     const char* success_msg = "Starting fos.bin...";
     delay(2000);
     int s_x = (VGA_WIDTH - strlen(success_msg)) / 2;
@@ -555,17 +558,20 @@ void execute_command() {
         terminal_write("  clear    - Clear terminal\n");
         terminal_write("  info     - System information\n");
         terminal_write("  reboot   - Reboot system\n");
-        terminal_write("  off      - Shutdown system\n\n");
+        terminal_write("  off      - Shutdown system\n");
+//      terminal_write("  panic    - Trigger kernel panic\n\n");
     } else if (strcmp(input_buffer, "clear") == 0) {
         terminal_clear();
     } else if (strcmp(input_buffer, "info") == 0) {
         terminal_write("Flolower-OS v1.0 x86-64\n");
         terminal_write("Architecture: x86-64 (64-bit)\n");
-        terminal_write("Features: ACPI, RAM-based history\n\n");
+        terminal_write("Features: ACPI, ATA disk-based history, kernel panic\n\n");
     } else if (strcmp(input_buffer, "reboot") == 0) {
         reboot();
     } else if (strcmp(input_buffer, "off") == 0) {
         acpi_shutdown();
+//  } else if (strcmp(input_buffer, "panic") == 0) {
+//      kernel_panic("User", "Manual panic triggered via command", "Restart the system");
     } else {
         terminal_write("Unknown command: ");
         terminal_write(input_buffer);
