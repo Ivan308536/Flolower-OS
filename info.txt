@@ -1,0 +1,20 @@
+============================================================
+                   FLOLOWER OS v1.0
+============================================================
+
+[ Welcome to Flolower OS! ]
+* Architecture: x86_64 (64-bit Long Mode)
+* Commands:     help, info, clear, reboot, off
+* Video Mode:   VGA Text Mode (80x25)
+* Kernel:       Root Core Custom
+
+[ Current features ]
+- Full 64-bit environment execution.
+- Command-line interface with history support (256 slots).
+- Manual GDT and PML4 Paging setup.
+- Direct hardware I/O for keyboard and screen.
+- ACPI RSDP discovery logic (in progress).
+
+[ Credits ]
+- Project: Flolower OS
+- Github: https://github.com/Ivan308536/Flolower-OS
