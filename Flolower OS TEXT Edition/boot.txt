@@ -1,0 +1,4 @@
+Welcome to Flolower OS!!!
+Loading kernel... 
+
+<entry: kernel.txt>
