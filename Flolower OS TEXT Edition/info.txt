@@ -1,0 +1,3 @@
+Info: 
+Name: Flolower OS
+Version: 1.0
