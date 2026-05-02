@@ -1,0 +1,10 @@
+
++------------ GRUB Loader v2.12 ------------+
+|                                           |
+| Flolower OS                               | <entry: boot.txt>
+| Flolower OS - Debug                       | <entry: debug.txt>
+| Flolower OS - Info                        | <entry: info.txt>
+|___________________________________________|
+
+ENTER = Selected, Arrow keys = switch
+
