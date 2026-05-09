@@ -5,7 +5,7 @@
 Flolower OS > help exit flolower vga edit GraphicalShell asm linux python3
 Flolower OS > 
 
-vga -> Initizalizing VGA Text Mode 80x25...
+vga -> Initizalizing VGA Text Mode Buffer: 80x25...
 help -> Commands: help, exit, flolower, vga, edit, GraphicalShell, asm, linux, python3
 flolower -> FlolowerOS
 edit -> 
