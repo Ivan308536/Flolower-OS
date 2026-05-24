@@ -1,3 +1,0 @@
-Debug: Flolower OS has loaded successful
-
-<halt>
